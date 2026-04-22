@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservar Lugar - Virtual Station</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/reservas.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">Virtual Station</div>
+        <nav>
+            <span id="nombre-usuario">Cargando...</span>
+            <button id="btn-salir" class="btn-accion" style="padding: 0.5rem 1rem; width: auto;">Cerrar Sesión</button>
+        </nav>
+    </header>
+
+    <main class="layout-reservas">
+        <section class="estacionamiento">
+            <h2>Mapa de Cajones</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Selecciona un lugar disponible.</p>
+            
+            <div class="indicadores">
+                <span class="tag disponible">Disponible</span>
+                <span class="tag ocupado">Ocupado</span>
+                <span class="tag seleccionado">Tu selección</span>
+            </div>
+            
+            <div id="contenedor-cajones" class="grid-estacionamiento">
+                </div>
+        </section>
+
+        <aside class="panel-control">
+            <h3>Detalles</h3>
+            <div id="info-cajon">
+                <p>Aún no has seleccionado ningún cajón.</p>
+            </div>
+            <button id="btn-ir-carrito" class="btn-accion" disabled>Continuar al Carrito</button>
+        </aside>
+    </main>
+
+    <script src="../js/reservas.js"></script>
+</body>
+</html>

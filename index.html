@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Virtual Station</title>
+    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="body-auth">
+    <main class="contenedor-auth">
+        <header>
+            <h1>Virtual Station</h1>
+            <p>Acceso al Sistema de Estacionamiento</p>
+        </header>
+
+        <form id="formulario-login">
+            <div class="campo">
+                <label for="usuario">Usuario</label>
+                <input type="text" id="usuario" placeholder="nombre@gmail.com" required>
+            </div>
+            
+            <div class="campo">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            
+            <button type="submit" class="btn-accion">Ingresar</button>
+        </form>
+        <p id="mensaje-error" class="error oculto">Credenciales incorrectas. Intenta de nuevo.</p>
+    </main>
+
+    <script src="js/auth.js"></script>
+</body>
+</html>

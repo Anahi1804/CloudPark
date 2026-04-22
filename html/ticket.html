@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tu Ticket - Virtual Station</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/ticket.css">
+</head>
+<body class="body-ticket">
+    <div class="comprobante" id="area-ticket">
+        <header class="ticket-header">
+            <div class="logo-ticket">Virtual Station</div>
+            <p>Comprobante de Reservación</p>
+            <small id="tkt-fecha">--/--/----</small>
+        </header>
+
+        <div class="cuerpo-ticket">
+            <div class="fila-detalle">
+                <span>Cajón:</span>
+                <strong id="tkt-cajon">--</strong>
+            </div>
+            <div class="fila-detalle">
+                <span>Usuario:</span>
+                <span id="tkt-usuario">--</span>
+            </div>
+            <div class="fila-detalle">
+                <span>Paquete:</span>
+                <span id="tkt-paquete">--</span>
+            </div>
+            
+            <div class="divisor"></div>
+
+            <div class="seccion-pin">
+                <p>CÓDIGO DE ACCESO</p>
+                <div id="tkt-codigo" class="pin-codigo">PARK-XXXX</div>
+                <small>Preséntalo al llegar a la pluma</small>
+            </div>
+
+            <div class="divisor"></div>
+
+            <div class="total-ticket">
+                <span>Total Pagado:</span>
+                <b id="tkt-total">$0.00 MXN</b>
+            </div>
+        </div>
+
+        <div class="decoracion-corte"></div>
+    </div>
+
+    <div class="acciones-finales">
+        <button onclick="window.print()" class="btn-imprimir">🖨️ Imprimir Ticket</button>
+        <button onclick="location.href='reservas.html'" class="btn-volver">Ir al Mapa</button>
+    </div>
+
+    <script src="../js/ticket.js"></script>
+</body>
+</html>

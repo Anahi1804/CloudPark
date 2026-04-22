@@ -1,0 +1,107 @@
+/* css/ticket.css */
+.body-ticket {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+    background-color: #f1f3f4;
+}
+
+.comprobante {
+    background: #ffffff;
+    width: 100%;
+    max-width: 360px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    position: relative;
+    border-top: 8px solid #1a73e8;
+}
+
+.logo-ticket {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #1a73e8;
+    margin-bottom: 0.2rem;
+}
+
+.ticket-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.fila-detalle {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    font-size: 1rem;
+}
+
+.divisor {
+    border-top: 2px dashed #dadce0;
+    margin: 1.5rem 0;
+}
+
+.seccion-pin {
+    text-align: center;
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.seccion-pin p {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #5f6368;
+    letter-spacing: 1.5px;
+    margin-bottom: 0.5rem;
+}
+
+.pin-codigo {
+    font-size: 2.2rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    color: #202124;
+    letter-spacing: 3px;
+}
+
+.total-ticket {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.2rem;
+}
+
+.total-ticket b {
+    color: #1a73e8;
+}
+
+.acciones-finales {
+    margin-top: 2.5rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-imprimir {
+    background: #202124;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-volver {
+    background: white;
+    color: #202124;
+    border: 1px solid #dadce0;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* Ocultar botones al imprimir */
+@media print {
+    .acciones-finales { display: none; }
+    .body-ticket { background: white; padding: 0; }
+    .comprobante { box-shadow: none; border: 1px solid #eee; }
+}
