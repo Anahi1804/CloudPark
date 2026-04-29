@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '../index.html';
         });
     }
+
     // Variables de la Interfaz
     const cajonesElementos = document.querySelectorAll('.cajon');
     const infoCajon = document.getElementById('info-cajon');
@@ -105,11 +106,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btnIrCarrito.disabled = true;
     }
 
-    // Mandar la selección al Carrito
-    btnIrCarrito.addEventListener('click', () => {
-        if (cajonSeleccionado) {
-            localStorage.setItem('cajonTemporal', cajonSeleccionado);
-            window.location.href = 'carrito.html'; // Ajusté la ruta para que no falle
-        }
-    });
-});
+if (btnIrCarrito) {
+        btnIrCarrito.addEventListener('click', () => {
+            if (cajonSeleccionado) {
+                localStorage.setItem('cajonTemporal', cajonSeleccionado);
+                window.location.href = 'carrito.html'; 
+            }
+        });
+    }
+}); // Este es el cierre del DOMContentLoaded, no lo pierdas de vista
