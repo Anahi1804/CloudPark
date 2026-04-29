@@ -1,5 +1,5 @@
 // js/auth.js
-
+console.log("🚀 El archivo auth.js SÍ está conectado correctamente!");
 document.addEventListener('DOMContentLoaded', () => {
     const formulario = document.getElementById('formulario-login');
     const mensajeError = document.getElementById('mensaje-error');
