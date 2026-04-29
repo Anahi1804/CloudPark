@@ -10,11 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    document.getElementById('btn-salir').addEventListener('click', () => {
-        localStorage.removeItem('usuarioLogueado');
-        window.location.href = '../index.html';
-    });
-
+// Buscamos el botón primero
+    const btnSalir = document.getElementById('btn-salir');
+    
+    // Solo le agregamos el evento SI el botón existe en esta página
+    if (btnSalir) {
+        btnSalir.addEventListener('click', () => {
+            localStorage.removeItem('usuarioLogueado');
+            window.location.href = '../index.html';
+        });
+    }
     // Variables de la Interfaz
     const cajonesElementos = document.querySelectorAll('.cajon');
     const infoCajon = document.getElementById('info-cajon');
