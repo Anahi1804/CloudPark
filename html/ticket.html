@@ -2,56 +2,84 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tu Ticket - Virtual Station</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/ticket.css">
 </head>
-<body class="body-ticket">
-    <div class="comprobante" id="area-ticket">
-        <header class="ticket-header">
-            <div class="logo-ticket">Virtual Station</div>
-            <p>Comprobante de Reservación</p>
-            <small id="tkt-fecha">--/--/----</small>
+<body class="bg-app">
+    <main class="mobile-container layout-fluido">
+        
+        <header class="app-header">
+            <a href="dashboard.html" class="btn-volver" title="Ir al inicio">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </a>
+            <div class="header-titulo">
+                <h2>Pase de Acceso</h2>
+                <p>Reserva confirmada</p>
+            </div>
+            <div style="width: 40px;"></div>
         </header>
 
-        <div class="cuerpo-ticket">
-            <div class="fila-detalle">
-                <span>Cajón:</span>
-                <strong id="tkt-cajon">--</strong>
-            </div>
-            <div class="fila-detalle">
-                <span>Usuario:</span>
-                <span id="tkt-usuario">--</span>
-            </div>
-            <div class="fila-detalle">
-                <span>Paquete:</span>
-                <span id="tkt-paquete">--</span>
-            </div>
-            
-            <div class="divisor"></div>
+        <div class="layout-ticket">
+            <div class="ticket-premium" id="area-ticket">
+                
+                <div class="ticket-header-interno">
+                    <div class="logo-ticket">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H7.3a2 2 0 0 0-1.6.8L3 11l-5.16.86a1 1 0 0 0-.84.99V16h3m14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM7 16a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"></path></svg>
+                        Virtual Station
+                    </div>
+                    <small id="tkt-fecha">--/--/----</small>
+                </div>
 
-            <div class="seccion-pin">
-                <p>CÓDIGO DE ACCESO</p>
-                <div id="tkt-codigo" class="pin-codigo">PARK-XXXX</div>
-                <small>Preséntalo al llegar a la pluma</small>
+                <div class="ticket-cuerpo">
+                    <div class="fila-detalle">
+                        <span class="etiqueta-detalle">Cajón Asignado:</span>
+                        <strong class="valor-detalle highlight" id="tkt-cajon">--</strong>
+                    </div>
+                    <div class="fila-detalle">
+                        <span class="etiqueta-detalle">Usuario:</span>
+                        <span class="valor-detalle" id="tkt-usuario">--</span>
+                    </div>
+                    <div class="fila-detalle">
+                        <span class="etiqueta-detalle">Paquete:</span>
+                        <span class="valor-detalle" id="tkt-paquete">--</span>
+                    </div>
+                    
+                    <div class="divisor-cortado">
+                        <div class="muesca izquierda"></div>
+                        <div class="linea-punteada"></div>
+                        <div class="muesca derecha"></div>
+                    </div>
+
+                    <div class="seccion-pin">
+                        <p class="pin-instruccion">CÓDIGO DE ACCESO EN PLUMA</p>
+                        <div id="tkt-codigo" class="pin-codigo neon-text">PARK-XXXX</div>
+                    </div>
+
+                    <div class="divisor-cortado">
+                        <div class="linea-punteada"></div>
+                    </div>
+
+                    <div class="total-ticket">
+                        <span class="etiqueta-total">Total Pagado:</span>
+                        <b id="tkt-total" class="monto-total">$0.00 MXN</b>
+                    </div>
+                </div>
             </div>
 
-            <div class="divisor"></div>
-
-            <div class="total-ticket">
-                <span>Total Pagado:</span>
-                <b id="tkt-total">$0.00 MXN</b>
+            <div class="acciones-finales">
+                <button onclick="window.print()" class="btn-secundario">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    Imprimir o PDF
+                </button>
+                <button onclick="location.href='dashboard.html'" class="btn-neon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                    Ir al Inicio
+                </button>
             </div>
         </div>
-
-        <div class="decoracion-corte"></div>
-    </div>
-
-    <div class="acciones-finales">
-        <button onclick="window.print()" class="btn-imprimir">🖨️ Imprimir Ticket</button>
-        <button onclick="location.href='reservas.html'" class="btn-volver">Ir al Mapa</button>
-    </div>
+    </main>
 
     <script src="../js/ticket.js"></script>
 </body>

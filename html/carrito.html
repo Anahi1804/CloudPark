@@ -2,54 +2,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Confirmar Reserva - Virtual Station</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/carrito.css">
 </head>
-<body>
-    <header class="navbar">
-        <div class="logo">Virtual Station</div>
-        <a href="reservas.html" class="link-volver">← Volver al mapa</a>
-    </header>
+<body class="bg-app">
+    <main class="mobile-container layout-fluido">
+        
+        <header class="app-header">
+            <a href="reservas.html" class="btn-volver" title="Volver al mapa">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </a>
+            <div class="header-titulo">
+                <h2>Confirmar Pago</h2>
+                <p>Completa tu reserva</p>
+            </div>
+            <div style="width: 40px;"></div> 
+        </header>
 
-    <main class="contenedor-carrito">
-        <section class="detalle-reserva">
-            <h2>Detalles del Paquete</h2>
-            <table class="tabla-resumen">
-                <tbody>
-                    <tr>
-                        <td>Cajón seleccionado:</td>
-                        <td><strong id="resumen-cajon">--</strong></td>
-                    </tr>
-                    <tr>
-                        <td>Usuario:</td>
-                        <td id="resumen-usuario">--</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="configuracion-pago">
-            <div class="ajuste-tiempo" style="flex-direction: column; align-items: flex-start; gap: 10px;">
-                <label for="select-paquete" style="font-weight: bold;">Selecciona tu paquete de tiempo:</label>
+        <div class="layout-carrito">
+            <section class="tarjeta-oscura">
+                <h3 class="titulo-seccion">Detalles del Paquete</h3>
                 
-                <select id="select-paquete" style="width: 100%; font-size: 1.1rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-                    <option value="" disabled selected>Elige una opción...</option>
-                    <option value="30" data-precio="15.00">⚡ Express - 30 minutos ($15.00)</option>
-                    <option value="60" data-precio="25.00">🚗 Estándar - 1 hora ($25.00)</option>
-                    <option value="120" data-precio="45.00">💼 Reunión - 2 horas ($45.00)</option>
-                    <option value="240" data-precio="80.00">🏢 Máximo - 4 horas ($80.00)</option>
-                </select>
-            </div>
-            
-            <div class="total-caja" style="margin-top: 1.5rem;">
-                <span>Total a pagar hoy:</span>
-                <strong id="monto-total">$0.00 MXN</strong>
-            </div>
-            
-            <button id="btn-finalizar" class="btn-accion" disabled>Pagar y Generar Código</button>
-        </section>
+                <div class="info-fila">
+                    <span class="info-etiqueta">Cajón asignado:</span>
+                    <strong class="info-valor cyan-glow" id="resumen-cajon">--</strong>
+                </div>
+                <div class="divisor-oscuro"></div>
+                <div class="info-fila">
+                    <span class="info-etiqueta">Usuario:</span>
+                    <span class="info-valor" id="resumen-usuario">--</span>
+                </div>
+            </section>
+
+            <section class="tarjeta-oscura seccion-pago">
+                <div class="grupo-input">
+                    <label for="select-paquete">Selecciona tu paquete de tiempo:</label>
+                    <div class="select-wrapper">
+                        <select id="select-paquete" class="select-dark">
+                            <option value="" disabled selected>Elige una opción...</option>
+                            <option value="30" data-precio="15.00">⚡ Express - 30 min ($15.00)</option>
+                            <option value="60" data-precio="25.00">🚗 Estándar - 1 hora ($25.00)</option>
+                            <option value="120" data-precio="45.00">💼 Reunión - 2 horas ($45.00)</option>
+                            <option value="240" data-precio="80.00">🏢 Máximo - 4 horas ($80.00)</option>
+                        </select>
+                        <div class="select-flecha">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="caja-total">
+                    <span class="etiqueta-total">Total a pagar hoy:</span>
+                    <strong id="monto-total" class="monto-neon">$0.00 MXN</strong>
+                </div>
+                
+                <button id="btn-finalizar" class="btn-neon" disabled>Pagar y Generar Código</button>
+            </section>
+        </div>
     </main>
 
     <script src="../js/carrito.js"></script>

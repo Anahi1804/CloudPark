@@ -1,63 +1,185 @@
 /* css/auth.css */
-.body-auth {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+
+:root {
+    /* Paleta "Dark Tech Premium" compartida */
+    --bg-app: #000000;            /* Negro puro OLED */
+    --surface: #1C1C1E;           /* Gris carbón mate para tarjeta */
+    --surface-hover: #2C2C2E;
+    --border-dark: rgba(255, 255, 255, 0.08);
+    
+    --text-main: #FFFFFF;         /* Blanco puro contraste */
+    --text-muted: #8E8E93;        /* Plata secundario */
+    
+    --spot-selected: #0A84FF;     /* Azul/Cyan Eléctrico */
+    --accent-glow: rgba(10, 132, 255, 0.4);
+}
+
+/* Forzar estilos base en el body de auth */
+body.bg-app {
+    background-color: var(--bg-app) !important;
     margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+}
+
+.mobile-container.layout-auth {
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: var(--bg-app) !important;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center; /* Centrado vertical */
+    align-items: center;
+    padding: 2rem;
 }
 
 .contenedor-auth {
-    background: var(--surface);
-    padding: 3rem 2.5rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    background-color: var(--surface);
+    border: 1px solid var(--border-dark);
     width: 100%;
-    max-width: 400px;
+    padding: 3rem 2rem;
+    border-radius: 24px;
     text-align: center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 15px 40px rgba(0,0,0,0.6);
 }
 
-.contenedor-auth header {
-    margin-bottom: 2rem;
+/* Header */
+.auth-header {
+    margin-bottom: 3rem;
 }
 
-.contenedor-auth h1 {
-    color: var(--primary);
-    margin-bottom: 0.5rem;
+.logo-icon-grande {
+    color: var(--spot-selected);
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: center;
+    filter: drop-shadow(0 0 15px var(--accent-glow));
 }
 
-.contenedor-auth p {
+.auth-header h1 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem;
+    color: var(--text-main);
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.auth-header p {
+    font-size: 1rem;
     color: var(--text-muted);
+    margin: 0;
+    font-weight: 500;
 }
 
-.campo {
-    margin-bottom: 1.5rem;
+/* Formulario */
+.form-dark {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.campo-input-wrapper {
     text-align: left;
 }
 
-.campo label {
+.campo-input-wrapper label {
     display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
+    margin-bottom: 0.6rem;
+    font-weight: 600;
     font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.campo input {
+/* Wrapper para icono + input */
+.input-con-icono {
+    position: relative;
     width: 100%;
-    padding: 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 1rem;
+}
+
+.icono-input {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    transition: color 0.2s;
+}
+
+.input-con-icono input {
+    width: 100%;
+    background-color: #000000; /* Fondo negro OLED para contraste interior */
+    color: var(--text-main);
+    border: 1px solid var(--border-dark);
+    border-radius: 14px;
+    padding: 1.1rem 1.1rem 1.1rem 3.2rem; /* Espacio extra a la izquierda para el icono */
+    font-size: 1.05rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
 }
 
-.campo input:focus {
-    border-color: var(--primary);
+.input-con-icono input:focus {
+    border-color: var(--spot-selected);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 0 15px rgba(10, 132, 255, 0.3);
 }
 
-.error {
-    color: var(--danger);
-    margin-top: 1rem;
-    font-size: 0.9rem;
+/* Cambiar color del icono al hacer foco en el input */
+.input-con-icono input:focus + .icono-input {
+    color: var(--spot-selected);
+}
+
+/* Placeholders plata */
+.input-con-icono input::placeholder {
+    color: #48484A;
+}
+
+/* Botón Premium */
+.btn-neon {
+    width: 100%;
+    background: linear-gradient(135deg, #0A84FF 0%, #005BB5 100%);
+    color: #FFFFFF;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 5px 15px rgba(10, 132, 255, 0.4));
+}
+
+.btn-grande {
+    padding: 1.2rem;
+    font-size: 1.15rem;
+    border-radius: 14px;
+}
+
+.btn-neon:active {
+    transform: scale(0.97);
+    filter: drop-shadow(0 2px 5px rgba(10, 132, 255, 0.3));
+}
+
+/* Mensaje de Error estilo Terminal Hardware */
+.mensaje-terminal.error {
+    margin-top: 2rem;
+    background-color: #110000; /* Rojo ultra oscuro */
+    border: 1px solid #FF453A;
+    color: #FF453A;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.mensaje-terminal.error svg {
+    flex-shrink: 0;
+}
+
+.mensaje-terminal.error p {
+    margin: 0;
 }

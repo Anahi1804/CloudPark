@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mensajeError.classList.add('oculto');
             
             // REDIRECCIÓN: Entramos a la carpeta html/ para buscar la vista de reservas
-            window.location.href = 'html/reservas.html';
+            window.location.href = 'html/dashboard.html';
             
         } else {
             // Mostramos el mensaje de error si la contraseña falla

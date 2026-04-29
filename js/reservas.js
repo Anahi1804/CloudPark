@@ -1,88 +1,110 @@
 // js/reservas.js
+// 1. Importamos nuestro puente de Firebase
+import { db, ref, onValue } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Validar Seguridad Básica
+    // Validar Sesión (Mantenemos la simulación por ahora)
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
     if (!usuarioLogueado) {
-        // Si alguien intenta entrar a reservas.html sin loguearse, lo pateamos al index
         window.location.href = '../index.html';
         return;
     }
 
-    // Mostrar el correo del usuario en el menú superior
-    document.getElementById('nombre-usuario').textContent = usuarioLogueado;
-
-    // Lógica para Cerrar Sesión
     document.getElementById('btn-salir').addEventListener('click', () => {
         localStorage.removeItem('usuarioLogueado');
         window.location.href = '../index.html';
     });
 
-    // 2. Simulación del estado del hardware (ESP32 vía Pyro)
-    const cajonesBackend = [
-        { id: 'A1', estado: 'disponible' },
-        { id: 'A2', estado: 'ocupado' },
-        { id: 'A3', estado: 'disponible' },
-        { id: 'A4', estado: 'disponible' },
-        { id: 'B1', estado: 'ocupado' },
-        { id: 'B2', estado: 'ocupado' },
-        { id: 'B3', estado: 'disponible' },
-        { id: 'B4', estado: 'disponible' }
-    ];
-
-    const gridCajones = document.getElementById('contenedor-cajones');
-    const panelInfo = document.getElementById('info-cajon');
+    // Variables de la Interfaz
+    const cajonesElementos = document.querySelectorAll('.cajon');
+    const infoCajon = document.getElementById('info-cajon');
     const btnIrCarrito = document.getElementById('btn-ir-carrito');
-    
     let cajonSeleccionado = null;
 
-    // 3. Dibujar el mapa en la pantalla
-    function renderizarMapa() {
-        gridCajones.innerHTML = ''; // Limpiar por si acaso
+    // 2. ESCUCHAMOS A FIREBASE EN TIEMPO REAL 📡
+    // Le decimos que mire la carpeta "estacionamiento_actual"
+    const estacionamientoRef = ref(db, 'estacionamiento_actual');
+    
+    onValue(estacionamientoRef, (snapshot) => {
+        const datos = snapshot.val();
         
-        cajonesBackend.forEach(cajon => {
-            const div = document.createElement('div');
-            div.classList.add('cajon', cajon.estado);
-            div.textContent = cajon.id;
+        // Si hay datos en Firebase, actualizamos el mapa
+        if (datos) {
+            actualizarMapaVisual(datos);
+        }
+    });
 
-            // Solo los disponibles se pueden clickear
-            if (cajon.estado === 'disponible') {
-                div.addEventListener('click', () => manejarSeleccion(cajon.id, div));
+    // 3. Función que pinta el mapa según Firebase
+    function actualizarMapaVisual(datosFirebase) {
+        // Mapeamos los nombres del ESP32 (cajon_1) con la web (A1)
+        const equivalencias = {
+            'A1': datosFirebase.cajon_1,
+            'A2': datosFirebase.cajon_2,
+            'A3': datosFirebase.cajon_3,
+            'B1': datosFirebase.cajon_4,
+            'B2': datosFirebase.cajon_5,
+            'B3': datosFirebase.cajon_6
+        };
+
+        cajonesElementos.forEach(cajon => {
+            const numero = cajon.querySelector('.numero-cajon').textContent;
+            const estadoEnNube = equivalencias[numero]; // "libre" u "ocupado"
+
+            // Limpiamos las clases actuales
+            cajon.classList.remove('disponible', 'ocupado');
+
+            if (estadoEnNube === 'ocupado') {
+                cajon.classList.add('ocupado');
+                // Si el cajón que teníamos seleccionado se ocupó de repente, lo deseleccionamos
+                if (cajonSeleccionado === numero) {
+                    resetearSeleccion();
+                }
+            } else {
+                cajon.classList.add('disponible');
             }
-            
-            gridCajones.appendChild(div);
         });
     }
 
-    // 4. Lógica al darle clic a un cajón
-    function manejarSeleccion(id, elementoDiv) {
-        // Quitar la clase 'seleccionado' a cualquier otro cajón que la tenga
-        const previos = document.querySelectorAll('.cajon.seleccionado');
-        previos.forEach(el => el.classList.remove('seleccionado'));
+    // 4. Lógica de clics (Solo para los disponibles)
+    cajonesElementos.forEach(cajon => {
+        cajon.addEventListener('click', () => {
+            // Si está ocupado por Firebase, no hacemos nada
+            if (cajon.classList.contains('ocupado')) return;
 
-        // Poner la clase 'seleccionado' al que acabamos de clickear
-        elementoDiv.classList.add('seleccionado');
-        cajonSeleccionado = id;
+            // Limpiar selecciones previas
+            cajonesElementos.forEach(c => {
+                if (c.classList.contains('seleccionado')) {
+                    c.classList.remove('seleccionado');
+                }
+            });
 
-        // Actualizar el panel derecho
-        panelInfo.innerHTML = `
-            <p><strong>Cajón:</strong> ${id}</p>
-            <p style="color: var(--success); font-weight: bold;">✓ Disponible para reserva</p>
-        `;
-        
-        // Habilitar el botón para avanzar
-        btnIrCarrito.disabled = false;
-    }
+            // Seleccionar el nuevo
+            cajon.classList.add('seleccionado');
+            cajonSeleccionado = cajon.querySelector('.numero-cajon').textContent;
 
-    // 5. Enviar al Carrito
-    btnIrCarrito.addEventListener('click', () => {
-        // Guardamos solo el cajón seleccionado temporalmente
-        localStorage.setItem('cajonTemporal', cajonSeleccionado);
-        
-        // Redirigimos a la vista del carrito (como están en la misma carpeta, va directo)
-        window.location.href = 'carrito.html';
+            // Actualizar panel derecho
+            infoCajon.innerHTML = `
+                <p class="etiqueta-info">Cajón seleccionado:</p>
+                <p class="valor-info cyan-glow">${cajonSeleccionado}</p>
+            `;
+            btnIrCarrito.disabled = false;
+        });
     });
 
-    // Iniciar el renderizado
-    renderizarMapa();
+    function resetearSeleccion() {
+        cajonSeleccionado = null;
+        infoCajon.innerHTML = `
+            <p class="etiqueta-info">Estado actual:</p>
+            <p class="valor-info" style="font-size: 1.2rem; color: var(--text-muted);">Esperando selección...</p>
+        `;
+        btnIrCarrito.disabled = true;
+    }
+
+    // Mandar la selección al Carrito
+    btnIrCarrito.addEventListener('click', () => {
+        if (cajonSeleccionado) {
+            localStorage.setItem('cajonTemporal', cajonSeleccionado);
+            window.location.href = 'carrito.html'; // Ajusté la ruta para que no falle
+        }
+    });
 });
