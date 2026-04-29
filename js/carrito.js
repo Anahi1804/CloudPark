@@ -1,4 +1,6 @@
 // js/carrito.js
+// 1. Importamos las herramientas para escribir en Firebase
+import { db, ref, set } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
@@ -22,15 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Detectar cuando el usuario elige un paquete
     selectPaquete.addEventListener('change', () => {
-        // Obtener la opción que el usuario seleccionó
         const opcion = selectPaquete.options[selectPaquete.selectedIndex];
-        
-        // Leer los datos de esa opción
         minutosPaquete = parseInt(opcion.value);
         precioSeleccionado = parseFloat(opcion.getAttribute('data-precio'));
-        nombrePaquete = opcion.text.split('-')[0].trim(); // Saca el nombre (ej. "⚡ Express")
-
-        // Actualizar la interfaz
+        nombrePaquete = opcion.text.split('-')[0].trim(); 
+        
         textoTotal.textContent = `$${precioSeleccionado.toFixed(2)} MXN`;
         btnFinalizar.disabled = false;
     });
@@ -45,8 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return codigo;
     }
 
-    // Guardar la compra
+    // 2. Guardar la compra en la Nube y en el Navegador
     btnFinalizar.addEventListener('click', () => {
+        
+        // Deshabilitamos el botón para que no le den doble clic
+        btnFinalizar.disabled = true;
+        btnFinalizar.textContent = "Procesando pago...";
+
+        const codigoGenerado = generarCodigoReserva();
+        
         const datosReserva = {
             usuario: usuarioLogueado,
             cajon: cajonSeleccionado,
@@ -54,13 +59,28 @@ document.addEventListener('DOMContentLoaded', () => {
             minutosComprados: minutosPaquete,
             totalPagado: precioSeleccionado,
             fecha: new Date().toLocaleString(),
-            codigo: generarCodigoReserva()
+            codigo: codigoGenerado,
+            estado: "valido" // Etiqueta para saber que no se ha usado en la salida
         };
 
-        // Guardamos y nos vamos al ticket
-        localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
-        localStorage.removeItem('cajonTemporal');
+        // PASO CLAVE: Creamos una carpeta en Firebase llamada "tickets_activos"
+        const ticketRef = ref(db, 'tickets_activos/' + codigoGenerado);
 
-        window.location.href = 'ticket.html';
+        // Subimos los datos a Firebase
+        set(ticketRef, datosReserva)
+            .then(() => {
+                // Si Firebase dice que todo salió bien, guardamos una copia rápida para la vista del ticket
+                localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
+                localStorage.removeItem('cajonTemporal');
+                
+                // Redirigimos al usuario a ver su ticket bonito
+                window.location.href = 'ticket.html';
+            })
+            .catch((error) => {
+                console.error("Error al guardar en Firebase:", error);
+                alert("Hubo un error de conexión. Intenta de nuevo.");
+                btnFinalizar.disabled = false;
+                btnFinalizar.textContent = "Pagar y Generar Código";
+            });
     });
 });
