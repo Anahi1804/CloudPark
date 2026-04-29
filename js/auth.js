@@ -1,6 +1,6 @@
 // js/auth.js
-import { auth } from './firebase-config.js';
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+//import { auth } from './firebase-config.js';
+//import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 console.log("🔥 1. Archivo auth.js cargado e iniciando...");
 
