@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reserva = JSON.parse(datosReservaString);
 
     // 3. Inyectar los datos en la vista
-    document.getElementById('tkt-fecha').textContent = reserva.fecha;
+    document.getElementById('tkt-fecha').textContent = reserva.fechaTexto;
     document.getElementById('tkt-cajon').textContent = reserva.cajon;
     document.getElementById('tkt-usuario').textContent = reserva.usuario;
     document.getElementById('tkt-paquete').textContent = reserva.paquete;

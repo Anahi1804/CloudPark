@@ -52,15 +52,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const codigoGenerado = generarCodigoReserva();
         
+// --- INICIO CÁLCULO DE TIEMPO (MODO PRUEBAS) ---
+        const ahora = new Date();
+        const fechaExpiracion = new Date(ahora);
+
+        // TRUCO DE DESARROLLADOR: 
+        // Tu select manda 30, 60, 120, etc. 
+        // En lugar de sumarle MINUTOS, le sumaremos SEGUNDOS para que caduque rápido.
+        // Ej: "1 hora" (60) va a durar exactamente 60 segundos en la vida real.
+        // Cuando presentes el proyecto oficial, solo cambias 'setSeconds' por 'setMinutes'.
+        fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete);
+        // -----------------------------------------------
+
         const datosReserva = {
             usuario: usuarioLogueado,
             cajon: cajonSeleccionado,
             paquete: nombrePaquete,
             minutosComprados: minutosPaquete,
             totalPagado: precioSeleccionado,
-            fecha: new Date().toLocaleString(),
             codigo: codigoGenerado,
-            estado: "valido" // Etiqueta para saber que no se ha usado en la salida
+            // Guardamos las fechas en milisegundos para que sea facilísimo restar tiempos después
+            timestampCompra: ahora.getTime(), 
+            timestampExpiracion: fechaExpiracion.getTime(),
+            fechaTexto: ahora.toLocaleString(), // Para mostrarlo bonito en el ticket
+            estado: "reservado" // ESTADO 2: Pagado pero no ha llegado físicamente
         };
 
         // PASO CLAVE: Creamos una carpeta en Firebase llamada "tickets_activos"
