@@ -49,20 +49,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // --- LÓGICA DE COBRO MATEMÁTICA ---
+// --- LÓGICA DE COBRO MATEMÁTICA ---
             const ahora = new Date().getTime();
             const tiempoAdentroMilisegundos = ahora - ticket.timestampIngresoFisico;
             
-            // TRUCO DE DESARROLLADOR: Convertimos milisegundos a "Minutos" (En realidad son segundos para pruebas rápidas)
+            // TRUCO DE DESARROLLADOR: Convertimos milisegundos a "Minutos"
+            // (1 segundo de la vida real = 1 minuto en tu sistema)
             const minutosRealesAdentro = Math.floor(tiempoAdentroMilisegundos / 1000);
             
-            // ¿Se pasó de su tiempo prepagado?
-            let minutosExtra = minutosRealesAdentro - ticket.minutosComprados;
-            if (minutosExtra < 0) minutosExtra = 0; // Si le sobró tiempo, no le cobramos nada extra
-
-            // Tarifa dinámica: Supongamos que cobramos $1.50 por cada "minuto" extra
-            const tarifaPorMinutoExtra = 1.50; 
-            const totalAPagarSalida = minutosExtra * tarifaPorMinutoExtra;
+            // Tu tarifa base es de $25 la hora. 
+            // Dividimos 25 / 60 para sacar cuánto cuesta cada minuto exacto:
+            const tarifaPorMinuto = 25.00 / 60; 
+            
+            // Se le cobra TODO el tiempo que estuvo adentro (el pago inicial fue solo por el apartado)
+            const totalAPagarSalida = minutosRealesAdentro * tarifaPorMinuto;
 
             // 3. RECOLECCIÓN DE BASURA (Borrar el ticket de Firebase)
             set(ticketRef, null).then(() => {
@@ -77,26 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong style="color: #FFFFFF;">${ticket.cajon}</strong>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>Tiempo extra:</span>
-                        <strong style="color: #FFFFFF;">${minutosExtra} min</strong>
+                        <span>Tiempo de estancia:</span>
+                        <strong style="color: #FFFFFF;">${minutosRealesAdentro} min</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
+                        <span>Total de Estacionamiento:</span>
+                        <strong style="color: #FF453A; font-size: 1.2rem;">$${totalAPagarSalida.toFixed(2)} MXN</strong>
                     </div>
                 `;
-
-                if (totalAPagarSalida > 0) {
-                    htmlCobro += `
-                        <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
-                            <span>A Pagar Ahora:</span>
-                            <strong style="color: #FF453A; font-size: 1.2rem;">$${totalAPagarSalida.toFixed(2)} MXN</strong>
-                        </div>
-                    `;
-                } else {
-                    htmlCobro += `
-                        <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
-                            <span>A Pagar Ahora:</span>
-                            <strong style="color: #32D74B; font-size: 1.2rem;">$0.00 MXN (Cubierto)</strong>
-                        </div>
-                    `;
-                }
 
                 detalleCobro.innerHTML = htmlCobro;
 
