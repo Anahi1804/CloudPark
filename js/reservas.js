@@ -1,19 +1,11 @@
 // js/reservas.js
-// 1. Importamos nuestro puente de Firebase
 import { db, ref, onValue } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Validar Sesión (Mantenemos la simulación por ahora)
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
-    if (!usuarioLogueado) {
-        window.location.href = '../index.html';
-        return;
-    }
+    if (!usuarioLogueado) { window.location.href = '../index.html'; return; }
 
-// Buscamos el botón primero
     const btnSalir = document.getElementById('btn-salir');
-    
-    // Solo le agregamos el evento SI el botón existe en esta página
     if (btnSalir) {
         btnSalir.addEventListener('click', () => {
             localStorage.removeItem('usuarioLogueado');
@@ -21,74 +13,80 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Variables de la Interfaz
     const cajonesElementos = document.querySelectorAll('.cajon');
     const infoCajon = document.getElementById('info-cajon');
     const btnIrCarrito = document.getElementById('btn-ir-carrito');
     let cajonSeleccionado = null;
 
-    // 2. ESCUCHAMOS A FIREBASE EN TIEMPO REAL 📡
-    // Le decimos que mire la carpeta "estacionamiento_actual"
+    // --- VARIABLES DE LA MÁQUINA DE ESTADOS ---
+    let estadoFisico = {}; // Lo que dice el hardware
+    let cajonesReservados = []; // Lo que dicen los tickets
+
+    // 1. ESCUCHAR HARDWARE (ESP32)
     const estacionamientoRef = ref(db, 'estacionamiento_actual');
-    
     onValue(estacionamientoRef, (snapshot) => {
-        const datos = snapshot.val();
-        
-        // Si hay datos en Firebase, actualizamos el mapa
-        if (datos) {
-            actualizarMapaVisual(datos);
-        }
+        estadoFisico = snapshot.val() || {};
+        procesarMapa(); // Recalcular mapa
     });
 
-    // 3. Función que pinta el mapa según Firebase
-    function actualizarMapaVisual(datosFirebase) {
-        // Mapeamos los nombres del ESP32 (cajon_1) con la web (A1)
+    // 2. ESCUCHAR COMPRAS (NUBE)
+    const ticketsRef = ref(db, 'tickets_activos');
+    onValue(ticketsRef, (snapshot) => {
+        const tickets = snapshot.val() || {};
+        // Filtramos solo los cajones que tienen un ticket en estado "reservado"
+        cajonesReservados = Object.values(tickets)
+            .filter(ticket => ticket.estado === "reservado")
+            .map(ticket => ticket.cajon);
+            
+        procesarMapa(); // Recalcular mapa
+    });
+
+    // 3. LA LÓGICA DE NEGOCIO (Cruzando datos)
+    function procesarMapa() {
+        // Mapeamos los nombres del ESP32 con la web
         const equivalencias = {
-            'A1': datosFirebase.cajon_1,
-            'A2': datosFirebase.cajon_2,
-            'A3': datosFirebase.cajon_3,
-            'B1': datosFirebase.cajon_4,
-            'B2': datosFirebase.cajon_5,
-            'B3': datosFirebase.cajon_6
+            'A1': estadoFisico.cajon_1, 'A2': estadoFisico.cajon_2, 'A3': estadoFisico.cajon_3,
+            'B1': estadoFisico.cajon_4, 'B2': estadoFisico.cajon_5, 'B3': estadoFisico.cajon_6
         };
 
         cajonesElementos.forEach(cajon => {
             const numero = cajon.querySelector('.numero-cajon').textContent;
-            const estadoEnNube = equivalencias[numero]; // "libre" u "ocupado"
+            const estadoSensor = equivalencias[numero]; // "libre" u "ocupado"
+            const tieneReservaActiva = cajonesReservados.includes(numero);
 
-            // Limpiamos las clases actuales
-            cajon.classList.remove('disponible', 'ocupado');
+            // Limpiamos colores
+            cajon.classList.remove('disponible', 'ocupado', 'reservado', 'seleccionado');
 
-            if (estadoEnNube === 'ocupado') {
+            // MÁQUINA DE ESTADOS:
+            if (estadoSensor === 'ocupado') {
+                // ESTADO 3: Físicamente ocupado (Rojo) - ¡Vence a cualquier reserva!
                 cajon.classList.add('ocupado');
-                // Si el cajón que teníamos seleccionado se ocupó de repente, lo deseleccionamos
-                if (cajonSeleccionado === numero) {
-                    resetearSeleccion();
-                }
+                if (cajonSeleccionado === numero) resetearSeleccion();
+
+            } else if (tieneReservaActiva) {
+                // ESTADO 2: Vacío físicamente, pero alguien ya lo pagó (Naranja)
+                cajon.classList.add('reservado');
+                if (cajonSeleccionado === numero) resetearSeleccion();
+
             } else {
+                // ESTADO 1: Libre de todo (Verde)
                 cajon.classList.add('disponible');
+                // Si estaba seleccionado por el usuario actual, se lo respetamos
+                if (cajonSeleccionado === numero) cajon.classList.add('seleccionado');
             }
         });
     }
 
-    // 4. Lógica de clics (Solo para los disponibles)
+    // 4. Lógica de clics
     cajonesElementos.forEach(cajon => {
         cajon.addEventListener('click', () => {
-            // Si está ocupado por Firebase, no hacemos nada
-            if (cajon.classList.contains('ocupado')) return;
+            // No dejar tocar si está ocupado o reservado por alguien más
+            if (cajon.classList.contains('ocupado') || cajon.classList.contains('reservado')) return;
 
-            // Limpiar selecciones previas
-            cajonesElementos.forEach(c => {
-                if (c.classList.contains('seleccionado')) {
-                    c.classList.remove('seleccionado');
-                }
-            });
-
-            // Seleccionar el nuevo
+            cajonesElementos.forEach(c => c.classList.remove('seleccionado'));
             cajon.classList.add('seleccionado');
             cajonSeleccionado = cajon.querySelector('.numero-cajon').textContent;
 
-            // Actualizar panel derecho
             infoCajon.innerHTML = `
                 <p class="etiqueta-info">Cajón seleccionado:</p>
                 <p class="valor-info cyan-glow">${cajonSeleccionado}</p>
@@ -99,19 +97,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetearSeleccion() {
         cajonSeleccionado = null;
-        infoCajon.innerHTML = `
-            <p class="etiqueta-info">Estado actual:</p>
-            <p class="valor-info" style="font-size: 1.2rem; color: var(--text-muted);">Esperando selección...</p>
-        `;
+        infoCajon.innerHTML = `<p class="etiqueta-info">Estado actual:</p><p class="valor-info" style="font-size: 1.2rem; color: var(--text-muted);">Esperando selección...</p>`;
         btnIrCarrito.disabled = true;
     }
 
-if (btnIrCarrito) {
+    if (btnIrCarrito) {
         btnIrCarrito.addEventListener('click', () => {
             if (cajonSeleccionado) {
                 localStorage.setItem('cajonTemporal', cajonSeleccionado);
-                window.location.href = 'carrito.html'; 
+                window.location.href = 'carrito.html';
             }
         });
     }
-}); // Este es el cierre del DOMContentLoaded, no lo pierdas de vista
+});
