@@ -1,17 +1,14 @@
 // js/salida.js
+// Importamos las herramientas (usaremos 'set' para borrar poniendo el valor en null)
+import { db, ref, get, set } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Validar Sesión
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
-    if (!usuarioLogueado) {
-        window.location.href = '../index.html';
-        return;
-    }
+    if (!usuarioLogueado) { window.location.href = '../index.html'; return; }
 
     const inputCodigo = document.getElementById('codigo-salida');
     const btnValidar = document.getElementById('btn-validar-salida');
-    
-    // Elementos de la pantalla de hardware
     const pantallaEstado = document.getElementById('pantalla-hardware');
     const loader = document.getElementById('loader-hardware');
     const iconoResultado = document.getElementById('icono-estado');
@@ -21,73 +18,101 @@ document.addEventListener('DOMContentLoaded', () => {
     btnValidar.addEventListener('click', () => {
         const codigoIngresado = inputCodigo.value.trim().toUpperCase();
         
-        if (codigoIngresado === '') {
-            inputCodigo.focus();
-            return;
-        }
+        if (codigoIngresado === '') { inputCodigo.focus(); return; }
 
-        // --- INICIA SIMULACIÓN DE SISTEMA DISTRIBUIDO (PYRO/PYTHON) ---
-        
         // 1. Bloquear interfaz y mostrar loader
         inputCodigo.disabled = true;
         btnValidar.disabled = true;
         pantallaEstado.classList.remove('oculto');
-        
-        // Resetear visuales de la pantalla
         loader.classList.remove('oculto');
         iconoResultado.classList.add('oculto');
         detalleCobro.classList.add('oculto');
         textoEstado.className = '';
-        textoEstado.textContent = 'Verificando hardware ESP32...';
+        textoEstado.textContent = 'Calculando tarifa y verificando...';
 
-        // Recuperar la base de datos simulada
-        const ticketGuardado = localStorage.getItem('ticketActual');
+        // 2. Buscamos el ticket en Firebase
+        const ticketRef = ref(db, 'tickets_activos/' + codigoIngresado);
 
-        // Retraso para simular comunicación por red
-        setTimeout(() => {
-            loader.classList.add('oculto');
-            iconoResultado.classList.remove('oculto');
-
-            if (!ticketGuardado) {
-                mostrarError("No se encontraron reservas en el sistema.");
+        get(ticketRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                mostrarError("Código no válido o el ticket ya fue liquidado.");
                 reactivarInterfaz();
                 return;
             }
 
-            const ticket = JSON.parse(ticketGuardado);
+            const ticket = snapshot.val();
 
-            // 2. Validar el Código
-            if (codigoIngresado === ticket.codigo) {
-                // ÉXITO
-                mostrarExito("¡Pago validado! Abriendo pluma...");
+            // Validación de seguridad: Tiene que haber entrado primero
+            if (ticket.estado !== "en_uso" || !ticket.timestampIngresoFisico) {
+                mostrarError("Error: Este código no ha registrado entrada en la pluma.");
+                reactivarInterfaz();
+                return;
+            }
+
+            // --- LÓGICA DE COBRO MATEMÁTICA ---
+            const ahora = new Date().getTime();
+            const tiempoAdentroMilisegundos = ahora - ticket.timestampIngresoFisico;
+            
+            // TRUCO DE DESARROLLADOR: Convertimos milisegundos a "Minutos" (En realidad son segundos para pruebas rápidas)
+            const minutosRealesAdentro = Math.floor(tiempoAdentroMilisegundos / 1000);
+            
+            // ¿Se pasó de su tiempo prepagado?
+            let minutosExtra = minutosRealesAdentro - ticket.minutosComprados;
+            if (minutosExtra < 0) minutosExtra = 0; // Si le sobró tiempo, no le cobramos nada extra
+
+            // Tarifa dinámica: Supongamos que cobramos $1.50 por cada "minuto" extra
+            const tarifaPorMinutoExtra = 1.50; 
+            const totalAPagarSalida = minutosExtra * tarifaPorMinutoExtra;
+
+            // 3. RECOLECCIÓN DE BASURA (Borrar el ticket de Firebase)
+            set(ticketRef, null).then(() => {
                 
+                // Mostrar éxito en la pantalla
+                mostrarExito("¡Liquidado! Abriendo pluma...");
                 detalleCobro.classList.remove('oculto');
-                detalleCobro.innerHTML = `
+                
+                let htmlCobro = `
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span>Cajón liberado:</span>
                         <strong style="color: #FFFFFF;">${ticket.cajon}</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Paquete cubierto:</span>
-                        <strong style="color: #FFFFFF;">${ticket.paquete}</strong>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Tiempo extra:</span>
+                        <strong style="color: #FFFFFF;">${minutosExtra} min</strong>
                     </div>
                 `;
 
-                // LOGICA DE NEGOCIO: Borrar el ticket para que no se re-utilice
-                localStorage.removeItem('ticketActual');
-                
-                // Opcional: Redirigir al dashboard después de 4 segundos
+                if (totalAPagarSalida > 0) {
+                    htmlCobro += `
+                        <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
+                            <span>A Pagar Ahora:</span>
+                            <strong style="color: #FF453A; font-size: 1.2rem;">$${totalAPagarSalida.toFixed(2)} MXN</strong>
+                        </div>
+                    `;
+                } else {
+                    htmlCobro += `
+                        <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
+                            <span>A Pagar Ahora:</span>
+                            <strong style="color: #32D74B; font-size: 1.2rem;">$0.00 MXN (Cubierto)</strong>
+                        </div>
+                    `;
+                }
+
+                detalleCobro.innerHTML = htmlCobro;
+
+                // Después de 5 segundos, limpiar todo por si viene el siguiente coche
                 setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 4000);
+                    pantallaEstado.classList.add('oculto');
+                    reactivarInterfaz();
+                }, 5000);
 
-            } else {
-                // ERROR
-                mostrarError("Código inválido o ya utilizado.");
-                reactivarInterfaz();
-            }
+            });
 
-        }, 1800); // 1.8 segundos de retraso simulado
+        }).catch((error) => {
+            console.error(error);
+            mostrarError("Error de conexión. Intenta de nuevo.");
+            reactivarInterfaz();
+        });
     });
 
     function mostrarExito(mensaje) {
@@ -103,11 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function reactivarInterfaz() {
-        setTimeout(() => {
-            inputCodigo.disabled = false;
-            btnValidar.disabled = false;
-            inputCodigo.value = '';
-            inputCodigo.focus();
-        }, 2000); // Darle tiempo al usuario de leer el error antes de resetear
+        inputCodigo.disabled = false;
+        btnValidar.disabled = false;
+        inputCodigo.value = '';
+        inputCodigo.focus();
     }
 });
