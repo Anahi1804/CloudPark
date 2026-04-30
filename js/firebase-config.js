@@ -1,8 +1,10 @@
 // js/firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-// 1. Agregamos "get" en esta línea
 import { getDatabase, ref, onValue, set, update, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+// Agregamos createUserWithEmailAndPassword
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+// NUEVO: Importamos Firestore
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB97Nlac70vu_rc_6XqCGPkfMa7rHCjkBk",
@@ -11,8 +13,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+const db = getDatabase(app); // La Realtime Database para los sensores
+const auth = getAuth(app); // Para el login
+const firestoreDB = getFirestore(app); // NUEVO: Para guardar los perfiles y el historial
 
-// 2. Agregamos "get" al final de esta lista para que otros archivos puedan usarlo
-export { db, auth, ref, onValue, set, update, get, signInWithEmailAndPassword };
+// Exportamos todo para que los demás archivos lo usen
+export { db, auth, firestoreDB, ref, onValue, set, update, get, signInWithEmailAndPassword, createUserWithEmailAndPassword, doc, setDoc };
