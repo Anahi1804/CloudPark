@@ -3,6 +3,7 @@ import { auth, firestoreDB, doc, getDoc, onAuthStateChanged, signOut } from './f
 
 document.addEventListener('DOMContentLoaded', () => {
     const nombreUsuario = document.getElementById('nombre-usuario');
+    const placaUsuario = document.getElementById('placa-usuario');
     const btnSalir = document.getElementById('btn-salir');
     const tarjetaTicket = document.getElementById('tarjeta-ticket');
 
@@ -17,6 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const datosUsuario = docSnap.data();
                 // Ponemos su nombre real en la pantalla
                 nombreUsuario.textContent = datosUsuario.nombre;
+                // Ponemos su placa con diseño de terminal
+                if (placaUsuario) {
+                    placaUsuario.textContent = datosUsuario.placa;
+                }
                 
                 // Opcional: Guardamos su correo en local solo por si otros scripts viejos lo necesitan temporalmente
                 localStorage.setItem('usuarioLogueado', datosUsuario.correo);
