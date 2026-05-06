@@ -1,10 +1,30 @@
 /* css/admin.css */
+:root {
+    --bg-app: #09090b; /* Negro profundo */
+    --surface-dark: #18181b; /* Gris oscuro para las tarjetas */
+    --border-dark: rgba(255, 255, 255, 0.1);
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --spot-selected: #a855f7; /* Acento morado neón */
+    --danger-neon: #ef4444;
+    --success-neon: #22c55e;
+}
+
+body {
+    background-color: var(--bg-app) !important;
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+}
+
 .admin-container {
     max-width: 1000px;
     margin: 0 auto;
     padding: 2rem;
 }
 
+/* Header */
 .admin-header {
     display: flex;
     justify-content: space-between;
@@ -14,60 +34,114 @@
     border-bottom: 1px solid var(--border-dark);
 }
 
+.admin-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #ffffff;
+}
+
+.admin-header p {
+    color: var(--spot-selected);
+    margin-top: 5px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+.btn-neon {
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-dark);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.btn-neon:hover {
+    border-color: var(--spot-selected);
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+}
+
+/* Layout */
 .admin-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
 }
 
-/* Tarjetas de estadísticas */
+/* Tarjetas */
 .stats-card {
     background: var(--surface-dark);
     padding: 1.5rem;
-    border-radius: 15px;
+    border-radius: 16px;
     border: 1px solid var(--border-dark);
     text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.stats-card h3 { color: var(--text-muted); font-size: 0.9rem; margin-top: 0; text-transform: uppercase; }
-.stats-card .numero { font-size: 2.5rem; color: var(--spot-selected); font-weight: 800; margin: 0.5rem 0; }
+.stats-card h3 { 
+    color: var(--text-muted); 
+    font-size: 0.85rem; 
+    margin-top: 0; 
+    text-transform: uppercase; 
+    letter-spacing: 1px;
+}
 
-/* Tabla de historial */
-.tabla-historial {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
+.stats-card .numero { 
+    font-size: 2.8rem; 
+    color: var(--spot-selected); 
+    font-weight: 800; 
+    margin: 0.5rem 0 0; 
+    text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+}
+
+/* Títulos de sección */
+h2 {
+    font-size: 1.2rem; 
+    color: #ffffff;
+    border-bottom: 1px solid var(--border-dark); 
+    padding-bottom: 10px;
+    margin-bottom: 1rem;
+}
+
+/* Tabla */
+.tabla-container {
     background: var(--surface-dark);
-    border-radius: 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border-dark);
     overflow: hidden;
 }
 
+.tabla-historial {
+    width: 100%;
+    border-collapse: collapse;
+}
+
 .tabla-historial th, .tabla-historial td {
-    padding: 1rem;
+    padding: 1.2rem 1rem;
     text-align: left;
     border-bottom: 1px solid var(--border-dark);
 }
 
 .tabla-historial th {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
     color: var(--text-muted);
     font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.tabla-historial tr:last-child td {
+    border-bottom: none;
 }
 
 .tabla-historial tr:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.03);
 }
 
-.badge-pagado {
-    background: rgba(50, 215, 75, 0.2);
-    color: #32D74B;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: bold;
-}
-
-/* Ajuste responsivo para celulares */
+/* Ajustes responsivos */
 @media (max-width: 768px) {
     .admin-grid { grid-template-columns: 1fr; }
     .admin-container { padding: 1rem; }
