@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const datosHistorial = {
                 ...ticket, // Copiamos toda la info del ticket original
                 fechaSalidaFisica: new Date().toLocaleString(),
+                timestampSalida: new Date().getTime(),
                 estadoFinal: "completado"
             };
 
