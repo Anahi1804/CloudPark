@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let historicoPagado = 0;
     let intervaloReloj;
     let hardwareListenerActivo = false;
+    let esPagoMulta = false;
 
     const ticketRef = ref(db, 'tickets_activos/' + codigoTicket);
     
@@ -66,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Caso D (LA MULTA): El usuario se tardó en salir y fue multado
 
         if (ticketFisico.estado === "multado") {
+            esPagoMulta = true;
             clearInterval(intervaloReloj);
             relojUI.style.fontSize = "3rem";
             relojUI.style.color = "var(--danger-neon)";
@@ -100,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
         if (ticketFisico.estado === "en_uso") {
+            esPagoMulta = false;
             // Sub-caso C1: Aún no se ha estacionado
             if (!ticketFisico.timestampIngresoFisico) {
                 relojUI.textContent = "Manejando";
@@ -127,45 +130,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-// Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
+            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
             clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
+            montoUI.style.color = "var(--danger-neon)";
             btnProcesar.disabled = false;
             
+            // Regresamos el botón a su color original por si venía de una multa
+            btnProcesar.textContent = "Pagar y Liberar Salida";
+            btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
+
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
                 const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
                 
-                // Simulación: dividimos entre 1000 para minutos rápidos de prueba
-                const minutosReales = Math.floor(milisegundosAdentro / 1000); 
+                const minutosReales = Math.floor(milisegundosAdentro / 1000);
                 
                 const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
                 const minutosUI = (minutosReales % 60).toString().padStart(2, '0');
                 relojUI.textContent = `${horasUI}:${minutosUI}`;
 
-                // ¡LA CORRECCIÓN!: ¿Cuánto tiempo compró en la entrada?
-                const minutosComprados = ticketFisico.minutosComprados || 0;
-
-                if (minutosReales <= minutosComprados) {
-                    // Aún está dentro de su tiempo pagado (¡ES GRATIS SALIR!)
-                    totalAPagar = 0;
-                    montoUI.style.color = "var(--success-neon)";
-                    montoUI.innerHTML = `$0.00 <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">Tiempo cubierto por tu paquete (${minutosComprados} min)</span>`;
-                    
-                    btnProcesar.textContent = "Generar Pase de Salida";
-                    btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
-                } else {
-                    // Ya se pasó de su paquete, empezamos a cobrarle TIEMPO EXTRA
-                    montoUI.style.color = "var(--danger-neon)";
-                    const minutosExtra = minutosReales - minutosComprados;
-                    let horasACobrar = Math.ceil(minutosExtra / 60);
-                    totalAPagar = horasACobrar * 25.00;
-                    
-                    montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr extra cobrada)</span>`;
-                    
-                    btnProcesar.textContent = `Pagar Tiempo Extra ($${totalAPagar.toFixed(2)})`;
-                    btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
-                }
+                let horasACobrar = Math.max(1, Math.ceil(minutosReales / 60));
+                totalAPagar = horasACobrar * 25.00;
+                
+                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
+                
             }, 1000);
         }
     });
@@ -176,15 +165,27 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProcesar.disabled = true;
         btnProcesar.textContent = "Procesando con banco...";
 
-        setTimeout(() => {
-            // Calculamos el gran total sumando el histórico + la deuda nueva
+    setTimeout(() => {
             const totalHistorico = historicoPagado + totalAPagar;
+            
+            let nuevoLiquidado = historicoPagado;
+            let nuevoRecargo = 0;
+            
+            if (esPagoMulta) {
+                // Si es multa: el dinero original se queda intacto, y guardamos la multa
+                nuevoLiquidado = historicoPagado; 
+                nuevoRecargo = totalAPagar;       
+            } else {
+                // Si es pago normal: lo sumamos a su cuenta limpia
+                nuevoLiquidado = historicoPagado + totalAPagar; 
+                nuevoRecargo = 0;
+            }
 
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: historicoPagado, // Dejamos el pago original intacto
-                recargoMulta: totalAPagar,       // NUEVO: Guardamos la deuda aparte
-                granTotal: totalHistorico,       // NUEVO: Guardamos la suma de ambos
+                totalLiquidado: nuevoLiquidado, // Guarda el dinero limpio
+                recargoMulta: nuevoRecargo,     // Guarda solo si hubo trampa
+                granTotal: totalHistorico,      // La suma de todo
                 timestampPagado: new Date().getTime() 
             }).then(() => console.log("Pago registrado y desglosado en la nube."));
         }, 2000);
