@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoVehiculo = document.getElementById('info-vehiculo');
 
     // --- 2. FIRESTORE: Cargar Historial y Contabilidad ---
+
     async function cargarHistorial() {
         try {
             // Buscamos la carpeta entera de historial_tickets
@@ -22,24 +23,24 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalTickets = 0;
             let htmlTabla = '';
 
-            const nombreCliente = ticket.nombre || "Cliente Web";
+            querySnapshot.forEach((doc) => {
+                const ticket = doc.data(); // AQUÍ nace la variable ticket
+                totalTickets++;
+                totalDinero += Number(ticket.totalLiquidado) || 0; 
+
+                // AHORA SÍ extraemos los datos (Adentro del ciclo)
+                const nombreCliente = ticket.nombre || "Cliente Web";
                 const placaCliente = ticket.placa || "N/A";
                 
-                // Calculamos el tiempo si tenemos los timestamps
                 let tiempoTexto = "-- min";
                 if (ticket.timestampIngresoFisico && ticket.timestampPagado) {
                     const min = Math.ceil((ticket.timestampPagado - ticket.timestampIngresoFisico) / 60000);
                     tiempoTexto = `${min} min`;
                 }
 
-            querySnapshot.forEach((doc) => {
-                const ticket = doc.data();
-                totalTickets++;
-                totalDinero += Number(ticket.totalLiquidado) || 0; // Sumamos el dinero
-
                 htmlTabla += `
                     <tr>
-                        <td style="font-family: monospace; color: var(--spot-selected);">${doc.id}</td>
+                        <td style="font-family: monospace; color: var(--spot-selected);">${doc.id.substring(0,8)}...</td>
                         <td><strong>${nombreCliente}</strong><br><span style="font-size: 0.8rem; color: var(--text-muted);">${placaCliente}</span></td>
                         <td><strong>${ticket.cajon}</strong></td>
                         <td>${tiempoTexto}</td>
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (totalTickets === 0) {
-                htmlTabla = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay tickets liquidados aún.</td></tr>`;
+                htmlTabla = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay tickets liquidados aún.</td></tr>`;
             }
 
             tablaBody.innerHTML = htmlTabla;
@@ -59,9 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Error al cargar historial:", error);
-            tablaBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger-neon);">Error al cargar los datos.</td></tr>`;
+            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger-neon);">Error al cargar los datos.</td></tr>`;
         }
     }
+
+    cargarHistorial();
 
     cargarHistorial();
 
