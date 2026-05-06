@@ -26,16 +26,27 @@ document.addEventListener('DOMContentLoaded', () => {
             querySnapshot.forEach((doc) => {
                 const ticket = doc.data(); // AQUÍ nace la variable ticket
                 totalTickets++;
-                totalDinero += Number(ticket.totalLiquidado) || 0; 
+// Extraemos los pagos desglosados
+                const pagoBase = Number(ticket.totalLiquidado) || 0;
+                const pagoMulta = Number(ticket.recargoMulta) || 0;
+                const granTotal = Number(ticket.granTotal) || (pagoBase + pagoMulta);
 
-                // AHORA SÍ extraemos los datos (Adentro del ciclo)
+                totalTickets++;
+                totalDinero += granTotal; // Sumamos el Gran Total a las ganancias de hoy
+
                 const nombreCliente = ticket.nombre || "Cliente Web";
                 const placaCliente = ticket.placa || "N/A";
                 
                 let tiempoTexto = "-- min";
-                if (ticket.timestampIngresoFisico && ticket.timestampPagado) {
-                    const min = Math.ceil((ticket.timestampPagado - ticket.timestampIngresoFisico) / 60000);
+                if (ticket.timestampIngresoFisico && ticket.timestampSalida) {
+                    const min = Math.ceil((ticket.timestampSalida - ticket.timestampIngresoFisico) / 60000);
                     tiempoTexto = `${min} min`;
+                }
+
+                // Armamos el texto visual del dinero
+                let uiDinero = `<span style="color: var(--success-neon);">$${pagoBase.toFixed(2)}</span>`;
+                if (pagoMulta > 0) {
+                    uiDinero += `<br><span style="font-size: 0.8rem; color: var(--danger-neon);">+ $${pagoMulta.toFixed(2)} multa</span>`;
                 }
 
                 htmlTabla += `
@@ -44,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><strong>${nombreCliente}</strong><br><span style="font-size: 0.8rem; color: var(--text-muted);">${placaCliente}</span></td>
                         <td><strong>${ticket.cajon}</strong></td>
                         <td>${tiempoTexto}</td>
-                        <td style="color: var(--success-neon); font-weight: bold;">$${Number(ticket.totalLiquidado || 0).toFixed(2)}</td>
+                        <td style="font-weight: bold;">${uiDinero}</td>
                         <td><span class="badge-pagado">Completado</span></td>
                     </tr>
                 `;

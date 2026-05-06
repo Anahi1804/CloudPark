@@ -163,14 +163,16 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
-            // Usamos la variable global historicoPagado
+            // Calculamos el gran total sumando el histórico + la deuda nueva
             const totalHistorico = historicoPagado + totalAPagar;
 
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: totalHistorico,
+                totalLiquidado: historicoPagado, // Dejamos el pago original intacto
+                recargoMulta: totalAPagar,       // NUEVO: Guardamos la deuda aparte
+                granTotal: totalHistorico,       // NUEVO: Guardamos la suma de ambos
                 timestampPagado: new Date().getTime() 
-            }).then(() => console.log("Pago registrado en la nube."));
+            }).then(() => console.log("Pago registrado y desglosado en la nube."));
         }, 2000);
     });
 });
