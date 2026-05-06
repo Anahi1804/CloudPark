@@ -122,6 +122,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Caso D: El usuario fue MULTADO en la caseta de salida
+        if (ticketFisico.estado === "multado") {
+            clearInterval(intervaloReloj);
+            relojUI.textContent = "MULTA";
+            relojUI.style.color = "var(--danger-neon)";
+            relojUI.style.fontSize = "3rem";
+            montoUI.innerHTML = `Tiempo excedido<br><span style="font-size: 1.2rem; color: #fff;">Paga la penalización para salir.</span>`;
+            
+            // Multa fija de $50 pesos por tardarse
+            totalAPagar = 50.00; 
+            
+            btnProcesar.disabled = false;
+            btnProcesar.textContent = "Pagar Multa ($50.00)";
+            btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
+            return; // Detenemos el código aquí
+        }
+
     // Procesar el pago (Simulado)
     formPago.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -135,6 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestampPagado: new Date().getTime() // NUEVO: Sellamos la hora exacta
             }).then(() => console.log("Pago registrado en la nube."));
         }, 2000);
-        
+
     });
 });
