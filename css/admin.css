@@ -1,0 +1,74 @@
+/* css/admin.css */
+.admin-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+/* Tarjetas de estadísticas */
+.stats-card {
+    background: var(--surface-dark);
+    padding: 1.5rem;
+    border-radius: 15px;
+    border: 1px solid var(--border-dark);
+    text-align: center;
+}
+
+.stats-card h3 { color: var(--text-muted); font-size: 0.9rem; margin-top: 0; text-transform: uppercase; }
+.stats-card .numero { font-size: 2.5rem; color: var(--spot-selected); font-weight: 800; margin: 0.5rem 0; }
+
+/* Tabla de historial */
+.tabla-historial {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background: var(--surface-dark);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.tabla-historial th, .tabla-historial td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.tabla-historial th {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.tabla-historial tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.badge-pagado {
+    background: rgba(50, 215, 75, 0.2);
+    color: #32D74B;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+/* Ajuste responsivo para celulares */
+@media (max-width: 768px) {
+    .admin-grid { grid-template-columns: 1fr; }
+    .admin-container { padding: 1rem; }
+}
