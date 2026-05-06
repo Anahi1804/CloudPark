@@ -1,5 +1,5 @@
 // js/salida.js
-import { db, ref, get, set, firestoreDB, doc, setDoc, update } from './firebase-config.js';
+import { db, ref, get, set, firestoreDB, doc, setDoc, update} from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Validar Sesión de quien opera la terminal
@@ -45,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ticket.timestampPagado && (ahora - ticket.timestampPagado) > limiteTolerancia) {
                 mostrarError("⏳ Tiempo de salida excedido. Se aplicará multa.");
                 
-                // CASTIGO: Le quitamos el estado "pagado", regresa a "en_uso" y borramos la hora de pago
+                // CASTIGO: Le quitamos el estado "pagado", regresa a "multado" y borramos la hora de pago
                 update(ticketRef, {
-                    estado: "en_uso",
+                    estado: "multado",
                     timestampPagado: null 
                 });
                 

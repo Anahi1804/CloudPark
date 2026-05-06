@@ -69,16 +69,15 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarHistorial();
 
     // --- 3. REALTIME DB: Monitor de Cajones en Vivo ---
+// --- 3. REALTIME DB: Monitor de Cajones en Vivo ---
     const ticketsRef = ref(db, 'tickets_activos');
     
     onValue(ticketsRef, (snapshot) => {
         const ticketsActivos = snapshot.val() || {};
         
-        // Armamos un mini mapa de 6 lugares
         let htmlMapa = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">`;
         const todosLosCajones = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'];
         
-        // Mapeamos qué cajón está ocupado por quién
         const cajonesOcupados = {};
         for (let id in ticketsActivos) {
             cajonesOcupados[ticketsActivos[id].cajon] = { id: id, ...ticketsActivos[id] };
@@ -88,14 +87,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const info = cajonesOcupados[cajon];
             
             if (info) {
-                // Colores: Naranja (Reservado), Rojo (En uso), Verde (Pagado)
-                let colorBorder = info.estado === 'en_uso' ? 'var(--danger-neon)' : 
-                                  info.estado === 'pagado' ? 'var(--success-neon)' : '#FFA500';
+                // NUEVOS COLORES: Naranja(Reserva), Azul(En Uso), Verde(Pagado), Magenta(Multado)
+                let colorBorder = '#FFA500'; 
+                if (info.estado === 'en_uso') colorBorder = 'var(--spot-selected)';
+                if (info.estado === 'pagado') colorBorder = 'var(--success-neon)';
+                if (info.estado === 'multado') colorBorder = '#FF00FF'; // ¡Magenta Neón!
                 
                 htmlMapa += `
                     <div class="cajon-admin" data-cajon="${cajon}" style="background: rgba(255,255,255,0.05); border: 2px solid ${colorBorder}; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer;">
                         <strong style="color: #fff; font-size: 1.2rem;">${cajon}</strong><br>
-                        <span style="font-size: 0.7rem; color: ${colorBorder}; text-transform: uppercase;">${info.estado}</span>
+                        <span style="font-size: 0.7rem; color: ${colorBorder}; text-transform: uppercase; font-weight: bold;">${info.estado}</span>
                     </div>
                 `;
             } else {
@@ -110,34 +111,71 @@ document.addEventListener('DOMContentLoaded', () => {
         htmlMapa += `</div>`;
         mapaContainer.innerHTML = htmlMapa;
 
-        // 4. Agregar la función de "Espiar" al hacer clic
+        // 4. Agregar la función de "Espiar" al hacer clic (¡Con UI arreglada!)
         document.querySelectorAll('.cajon-admin').forEach(btn => {
             btn.addEventListener('click', () => {
                 const cajonSeleccionado = btn.getAttribute('data-cajon');
                 const datos = cajonesOcupados[cajonSeleccionado];
                 
                 if (datos) {
-                    // Calculamos tiempo en vivo
-                    let tiempoVivo = "No ha llegado al cajón";
+                    let tiempoVivo = '<span style="color: var(--text-muted); font-size: 1.1rem;">Aún en tránsito</span>';
                     if (datos.timestampIngresoFisico) {
                         const minutos = Math.floor((new Date().getTime() - datos.timestampIngresoFisico) / 60000);
-                        tiempoVivo = `<span style="color: var(--danger-neon); font-weight: bold;">${minutos} min en uso</span>`;
+                        tiempoVivo = `<span style="color: #FFFFFF; font-weight: bold; font-size: 1.4rem;">${minutos} <small style="font-size: 0.9rem; color: var(--text-muted);">min</small></span>`;
                     }
 
+                    // Reconstruimos la tarjeta en bloques hacia abajo para que no se aplaste
                     infoVehiculo.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed var(--border-dark); padding-bottom: 8px;">
-                            <span style="color: var(--text-muted);">Estado Actual:</span>
-                            <strong style="color: var(--spot-selected); text-transform: uppercase;">${datos.estado}</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <span style="color: var(--text-muted);">Cliente / Placa:</span>
-                            <strong style="color: #fff;">${datos.nombre || 'Cliente'} (${datos.placa || 'N/A'})</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <span style="color: var(--text-muted);">Tiempo transcurrido:</span>
-                            <span>${tiempoVivo}</span>
+                        <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 100%;">
+                            <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
+                                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Estado del Ticket</span><br>
+                                <strong style="color: ${datos.estado === 'multado' ? '#FF00FF' : 'var(--spot-selected)'}; font-size: 1.3rem; text-transform: uppercase;">${datos.estado}</strong>
+                            </div>
+                            <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
+                                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cajón / Código</span><br>
+                                <strong style="color: #fff; font-size: 1.2rem;">${datos.cajon} <span style="color: var(--text-muted); font-size: 1rem;">(${datos.id})</span></strong>
+                            </div>
+                            <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
+                                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cuenta del Cliente</span><br>
+                                <strong style="color: #fff; font-size: 1.1rem;">${datos.usuario || 'Desconocido'}</strong>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Tiempo Estacionado</span><br>
+                                ${tiempoVivo}
+                            </div>
                         </div>
                     `;
+                }
+            });
+        });
+    });
+
+    // --- 5. PARCHE DE SERVIDOR: El Admin vigila los sensores físicos ---
+    // Esto resuelve el problema de depender del celular del usuario (Fase 3)
+    const hardwareRef = ref(db, 'estacionamiento_actual');
+    onValue(hardwareRef, async (sensorSnap) => {
+        const sensores = sensorSnap.val() || {};
+        const equivalencias = { 'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3', 'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3' };
+        
+        // Obtenemos los tickets actuales una vez cada que un sensor se mueve
+        import('./firebase-config.js').then(module => {
+            module.get(ref(db, 'tickets_activos')).then(snapTickets => {
+                const tickets = snapTickets.val() || {};
+                
+                for (let codigo in tickets) {
+                    const ticket = tickets[codigo];
+                    // Si ya pasó la pluma pero no ha iniciado su reloj...
+                    if (ticket.estado === "en_uso" && !ticket.timestampIngresoFisico) {
+                        const idSensorFisico = Object.keys(equivalencias).find(key => equivalencias[key] === ticket.cajon);
+                        
+                        // Si el sensor que le toca dice "ocupado", el Admin inicia el reloj por él
+                        if (idSensorFisico && sensores[idSensorFisico] === "ocupado") {
+                            console.log(`[Admin Automático] Vehículo detectado en ${ticket.cajon}. Iniciando reloj.`);
+                            module.update(ref(db, `tickets_activos/${codigo}`), { 
+                                timestampIngresoFisico: new Date().getTime() 
+                            });
+                        }
+                    }
                 }
             });
         });
