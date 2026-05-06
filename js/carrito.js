@@ -66,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const datosReserva = {
             usuario: usuarioLogueado,
+            nombre: localStorage.getItem('nombreUsuario') || "Usuario", // ¡NUEVO!
+            placa: localStorage.getItem('placaUsuario') || "S/N",       // ¡NUEVO!
             cajon: cajonSeleccionado,
             paquete: nombrePaquete,
             minutosComprados: minutosPaquete,

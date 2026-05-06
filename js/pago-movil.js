@@ -61,20 +61,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Caso D (LA MULTA): El usuario se tardó en salir y fue multado
+
         if (ticketFisico.estado === "multado") {
             clearInterval(intervaloReloj);
-            relojUI.textContent = "MULTA";
-            relojUI.style.color = "var(--danger-neon)";
             relojUI.style.fontSize = "3rem";
-            montoUI.innerHTML = `Tiempo excedido<br><span style="font-size: 1.2rem; color: #fff;">Paga la penalización para salir.</span>`;
-            
-            // Multa fija de $50 pesos por tardarse
-            totalAPagar = 50.00; 
-            
+            relojUI.style.color = "var(--danger-neon)";
             btnProcesar.disabled = false;
-            btnProcesar.textContent = "Pagar Multa ($50.00)";
-            btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
-            return;
+            
+            intervaloReloj = setInterval(() => {
+                const ahora = new Date().getTime();
+                
+                // Límite de prueba 30 seg (30000 ms). En producción pon 15 min (900000 ms)
+                const tiempoTolerancia = 30000; 
+                const inicioMulta = ticketFisico.timestampPagado + tiempoTolerancia;
+                
+                // Calculamos cuánto tiempo lleva ATRASADO
+                const milisegundosRetraso = ahora - inicioMulta;
+                const minutosRetraso = Math.floor(milisegundosRetraso / 1000); // Usamos div /1000 para simular minutos rápidos
+                
+                const horasUI = Math.floor(minutosRetraso / 60).toString().padStart(2, '0');
+                const minUI = (minutosRetraso % 60).toString().padStart(2, '0');
+                relojUI.textContent = `+ ${horasUI}:${minUI} extra`;
+
+                // Cobramos $25 por cada hora (o fracción) de retraso
+                let horasMulta = Math.max(1, Math.ceil(minutosRetraso / 60));
+                totalAPagar = horasMulta * 25.00;
+
+                montoUI.innerHTML = `Recargo: $${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted);">MXN</span>`;
+                btnProcesar.textContent = `Pagar Recargo ($${totalAPagar.toFixed(2)})`;
+                btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
+            }, 1000);
+            
+            return; // Detenemos aquí para que no corra el otro reloj
         }
 
         // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
@@ -142,13 +160,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
+            // Sumamos lo que ya había pagado antes + la multa/recargo actual
+            const totalHistorico = (Number(ticketFisico.totalLiquidado) || 0) + totalAPagar;
+
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: totalAPagar,
-                timestampPagado: new Date().getTime() 
-            }).then(() => {
-                console.log("Pago registrado en la nube.");
-            });
+                totalLiquidado: totalHistorico,
+                timestampPagado: new Date().getTime() // Nuevo sello para darle 15 min extra
+            }).then(() => console.log("Pago registrado en la nube."));
         }, 2000);
     });
 });

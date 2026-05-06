@@ -136,10 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <strong style="color: #fff; font-size: 1.2rem;">${datos.cajon} <span style="color: var(--text-muted); font-size: 1rem;">(${datos.id})</span></strong>
                             </div>
                             <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
-                                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cuenta del Cliente</span><br>
-                                <strong style="color: #fff; font-size: 1.1rem;">${datos.usuario || 'Desconocido'}</strong>
-                            </div>
-                            <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
                                 <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cliente / Placa</span><br>
                                 <strong style="color: #fff; font-size: 1.1rem;">${datos.usuario || 'Desconocido'} <span style="color: var(--spot-selected); font-family: monospace;">[${datos.placa || 'S/N'}]</span></strong>
                             </div>

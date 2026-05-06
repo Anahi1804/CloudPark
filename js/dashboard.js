@@ -16,12 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (docSnap.exists()) {
                 const datosUsuario = docSnap.data();
+
                 // Ponemos su nombre real en la pantalla
                 nombreUsuario.textContent = datosUsuario.nombre;
-                // Ponemos su placa con diseño de terminal
-                if (placaUsuario) {
-                    placaUsuario.textContent = datosUsuario.placa;
-                }
+                if (placaUsuario) placaUsuario.textContent = datosUsuario.placa;
+                
+                // NUEVO: Guardamos esto en la memoria local para el Carrito
+                localStorage.setItem('nombreUsuario', datosUsuario.nombre);
+                localStorage.setItem('placaUsuario', datosUsuario.placa);
                 
                 // Opcional: Guardamos su correo en local solo por si otros scripts viejos lo necesitan temporalmente
                 localStorage.setItem('usuarioLogueado', datosUsuario.correo);
