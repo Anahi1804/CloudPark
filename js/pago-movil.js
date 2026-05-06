@@ -131,8 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: totalAPagar 
+                totalLiquidado: totalAPagar,
+                timestampPagado: new Date().getTime() // NUEVO: Sellamos la hora exacta
             }).then(() => console.log("Pago registrado en la nube."));
         }, 2000);
+        
     });
 });

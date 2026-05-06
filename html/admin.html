@@ -58,20 +58,22 @@
         <!-- Tabla del Historial de Firestore -->
         <section style="margin-top: 3rem;">
             <h2>Registro Histórico de Pagos</h2>
-            <div class="tabla-container" style="overflow-x: auto;">
-                <table class="tabla-historial">
+            <!-- Este div evita el desbordamiento -->
+            <div style="width: 100%; overflow-x: auto; background: var(--surface-dark); border-radius: 12px; border: 1px solid var(--border-dark);">
+                <table class="tabla-historial" style="min-width: 900px;">
                     <thead>
                         <tr>
                             <th>Código</th>
+                            <th>Cliente / Placa</th>
                             <th>Cajón</th>
-                            <th>Salida</th>
+                            <th>Tiempo Total</th>
                             <th>Liquidado</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody id="tabla-body-historial">
                         <tr>
-                            <td colspan="5" style="text-align: center; color: var(--text-muted);">Cargando registros...</td>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando registros...</td>
                         </tr>
                     </tbody>
                 </table>

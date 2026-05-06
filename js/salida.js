@@ -36,6 +36,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // NUEVA REGLA: ¿Pasaron más de 15 minutos desde que pagó?
+            const ahora = new Date().getTime();
+            // TRUCO DEV: 15 minutos reales son 900,000 ms. 
+            // Para probarlo AHORITA, lo pondremos en 30 segundos (30000 ms).
+            const limiteTolerancia = 30000; 
+
+            if (ticket.timestampPagado && (ahora - ticket.timestampPagado) > limiteTolerancia) {
+                mostrarError("⏳ Tiempo de salida excedido. Se aplicará multa.");
+                
+                // CASTIGO: Le quitamos el estado "pagado", regresa a "en_uso" y borramos la hora de pago
+                update(ticketRef, {
+                    estado: "en_uso",
+                    timestampPagado: null 
+                });
+                
+                setTimeout(() => {
+                    pantallaEstado.classList.add('oculto');
+                    reactivarInterfaz();
+                }, 5000);
+                return; // Cortamos el proceso para que NO abra la pluma
+            }
+
             // ¡ÉXITO! El cliente ya pagó. Procedemos con la Mudanza de Datos.
             textoEstado.textContent = "Archivando ticket...";
 

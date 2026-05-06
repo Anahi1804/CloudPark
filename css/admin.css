@@ -19,7 +19,8 @@ body {
 }
 
 .admin-container {
-    max-width: 1000px;
+    width: 95%; /* Usa casi toda la pantalla */
+    max-width: 1600px; /* Límite para pantallas ultra anchas */
     margin: 0 auto;
     padding: 2rem;
 }

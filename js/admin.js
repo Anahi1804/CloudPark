@@ -22,6 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalTickets = 0;
             let htmlTabla = '';
 
+            const nombreCliente = ticket.nombre || "Cliente Web";
+                const placaCliente = ticket.placa || "N/A";
+                
+                // Calculamos el tiempo si tenemos los timestamps
+                let tiempoTexto = "-- min";
+                if (ticket.timestampIngresoFisico && ticket.timestampPagado) {
+                    const min = Math.ceil((ticket.timestampPagado - ticket.timestampIngresoFisico) / 60000);
+                    tiempoTexto = `${min} min`;
+                }
+
             querySnapshot.forEach((doc) => {
                 const ticket = doc.data();
                 totalTickets++;
@@ -30,8 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 htmlTabla += `
                     <tr>
                         <td style="font-family: monospace; color: var(--spot-selected);">${doc.id}</td>
+                        <td><strong>${nombreCliente}</strong><br><span style="font-size: 0.8rem; color: var(--text-muted);">${placaCliente}</span></td>
                         <td><strong>${ticket.cajon}</strong></td>
-                        <td style="font-size: 0.85rem; color: var(--text-muted);">${ticket.fechaSalidaFisica || 'N/A'}</td>
+                        <td>${tiempoTexto}</td>
                         <td style="color: var(--success-neon); font-weight: bold;">$${Number(ticket.totalLiquidado || 0).toFixed(2)}</td>
                         <td><span class="badge-pagado">Completado</span></td>
                     </tr>
@@ -103,18 +114,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const datos = cajonesOcupados[cajonSeleccionado];
                 
                 if (datos) {
+                    // Calculamos tiempo en vivo
+                    let tiempoVivo = "No ha llegado al cajón";
+                    if (datos.timestampIngresoFisico) {
+                        const minutos = Math.floor((new Date().getTime() - datos.timestampIngresoFisico) / 60000);
+                        tiempoVivo = `<span style="color: var(--danger-neon); font-weight: bold;">${minutos} min en uso</span>`;
+                    }
+
                     infoVehiculo.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed var(--border-dark); padding-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed var(--border-dark); padding-bottom: 8px;">
                             <span style="color: var(--text-muted);">Estado Actual:</span>
                             <strong style="color: var(--spot-selected); text-transform: uppercase;">${datos.estado}</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span style="color: var(--text-muted);">Cajón Ocupado:</span>
-                            <strong style="color: #fff;">${datos.cajon}</strong>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span style="color: var(--text-muted);">Cliente / Placa:</span>
+                            <strong style="color: #fff;">${datos.nombre || 'Cliente'} (${datos.placa || 'N/A'})</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span style="color: var(--text-muted);">Código de Ticket:</span>
-                            <strong style="font-family: monospace; color: #fff;">${datos.id}</strong>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span style="color: var(--text-muted);">Tiempo transcurrido:</span>
+                            <span>${tiempoVivo}</span>
                         </div>
                     `;
                 }
