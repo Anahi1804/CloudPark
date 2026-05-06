@@ -1,5 +1,5 @@
 // js/salida.js
-import { db, ref, get, set, firestoreDB, doc, setDoc } from './firebase-config.js';
+import { db, ref, get, set, firestoreDB, doc, setDoc, update } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Validar Sesión de quien opera la terminal
