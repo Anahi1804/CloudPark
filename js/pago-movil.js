@@ -2,7 +2,6 @@
 import { db, ref, onValue, update } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Verificar si hay un ticket activo en la memoria local
     const ticketGuardado = localStorage.getItem('ticketActual');
     if (!ticketGuardado) {
         alert("No tienes ninguna estancia activa.");
@@ -18,37 +17,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const formPago = document.getElementById('form-pago-simulado');
     const btnProcesar = document.getElementById('btn-procesar-pago');
 
-    let tarifaPorMinuto = 25.00 / 60; // $25 pesos la hora
     let totalAPagar = 0;
     let intervaloReloj;
+    let hardwareListenerActivo = false;
 
-    // 2. Conectarnos a Firebase para escuchar el ticket en tiempo real
     const ticketRef = ref(db, 'tickets_activos/' + codigoTicket);
     
     onValue(ticketRef, (snapshot) => {
         const ticketFisico = snapshot.val();
 
         if (!ticketFisico) {
-            // Si no existe, es porque ya salió y el ticket se borró
             clearInterval(intervaloReloj);
             relojUI.textContent = "00:00";
             montoUI.innerHTML = `$0.00 <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span>`;
             return;
         }
 
-        // Caso A: El usuario ya pagó el apartado, pero AÚN NO ENTRA al estacionamiento
+        // Caso A: El usuario ya pagó el apartado, pero AÚN NO ENTRA por la pluma
         if (ticketFisico.estado === "reservado") {
             relojUI.textContent = "En camino";
             relojUI.style.fontSize = "2.5rem";
             montoUI.innerHTML = `Esperando ingreso...`;
-            montoUI.style.fontSize = "1.2rem";
-            montoUI.style.color = "var(--text-muted)";
             btnProcesar.disabled = true;
-            btnProcesar.style.background = "var(--surface-hover)";
             return;
         }
 
-        // Caso B: El usuario ya pagó su salida y está por irse
+        // Caso B: El usuario ya pagó su salida
         if (ticketFisico.estado === "pagado") {
             clearInterval(intervaloReloj);
             relojUI.textContent = "PAGADO";
@@ -65,59 +59,80 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso C: El usuario está "en_uso" (Adentro del estacionamiento)
-        if (ticketFisico.estado === "en_uso" && ticketFisico.timestampIngresoFisico) {
-            // Asegurarnos de no arrancar dos relojes
-            clearInterval(intervaloReloj); 
+        // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
+        if (ticketFisico.estado === "en_uso") {
             
-            // Reajustar UI por si venía del estado "En camino"
+            // Sub-caso C1: Aún no se ha estacionado (No hay timestamp)
+            if (!ticketFisico.timestampIngresoFisico) {
+                relojUI.textContent = "Manejando";
+                relojUI.style.fontSize = "2rem";
+                montoUI.innerHTML = `Dirígete al cajón ${ticketFisico.cajon}`;
+                btnProcesar.disabled = true;
+
+                // Empezamos a espiar al sensor del ESP32 para ver cuándo se estaciona
+                if (!hardwareListenerActivo) {
+                    hardwareListenerActivo = true;
+                    const equivalencias = {
+                        'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3',
+                        'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6'
+                    };
+                    const cajonIdHardware = equivalencias[ticketFisico.cajon];
+                    const sensorRef = ref(db, `estacionamiento_actual/${cajonIdHardware}`);
+                    
+                    // Escuchamos solo el sensor del cajón asignado
+                    onValue(sensorRef, (sensorSnap) => {
+                        const estadoCajon = sensorSnap.val();
+                        if (estadoCajon === "ocupado" && !ticketFisico.timestampIngresoFisico) {
+                            // ¡El ESP32 detectó el auto! Guardamos la hora de inicio en Firebase
+                            console.log("¡Auto detectado en el cajón! Iniciando reloj...");
+                            update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
+                        }
+                    });
+                }
+                return; // Pausamos aquí hasta que el hardware cambie
+            }
+
+            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
+            clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
             montoUI.style.color = "var(--danger-neon)";
             btnProcesar.disabled = false;
-            btnProcesar.style.background = "";
 
-            // Iniciar el cronómetro que actualiza cada segundo
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
                 const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
                 
-                // TRUCO DE DESARROLLADOR: Convertimos milisegundos a "minutos" de sistema
                 const minutosReales = Math.floor(milisegundosAdentro / 1000);
                 
-                // Formatear reloj a MM:SS visuales (simulado)
                 const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
                 const minutosUI = (minutosReales % 60).toString().padStart(2, '0');
                 relojUI.textContent = `${horasUI}:${minutosUI}`;
 
-                // Calcular dinero
-                totalAPagar = minutosReales * tarifaPorMinuto;
-                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span>`;
+                // --- NUEVA MATEMÁTICA: COBRO POR HORA FRACCIONADA ---
+                // Math.ceil() redondea siempre hacia arriba. Ej: 1.1 horas = 2 horas a cobrar.
+                // Math.max(1, ...) asegura que mínimo se cobre 1 hora apenas te estacionas.
+                let horasACobrar = Math.max(1, Math.ceil(minutosReales / 60));
+                
+                // Si justo entra (minuto 0), horasACobrar será 1.
+                totalAPagar = horasACobrar * 25.00;
+                
+                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
                 
             }, 1000);
         }
     });
 
-    // 3. Procesar el pago (Simulado)
+    // Procesar el pago (Simulado)
     formPago.addEventListener('submit', (e) => {
         e.preventDefault();
-        
         btnProcesar.disabled = true;
-        btnProcesar.textContent = "Procesando pago con banco...";
+        btnProcesar.textContent = "Procesando con banco...";
 
-        // Simulamos que el banco tarda 2 segundos en responder
         setTimeout(() => {
-            // Cambiamos el estado en Firebase a "pagado"
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: totalAPagar // Guardamos cuánto pagó para el historial
-            }).then(() => {
-                // Firebase detectará el cambio a "pagado" y actualizará la interfaz automáticamente
-                console.log("Pago registrado en la nube.");
-            }).catch(error => {
-                console.error("Error al pagar:", error);
-                btnProcesar.disabled = false;
-                btnProcesar.textContent = "Reintentar Pago";
-            });
+                totalLiquidado: totalAPagar 
+            }).then(() => console.log("Pago registrado en la nube."));
         }, 2000);
     });
 });

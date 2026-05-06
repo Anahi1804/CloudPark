@@ -60,8 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 3. ¡ÉXITO! Pasó todas las validaciones de seguridad
             // ESTADO 3: Cambiamos a "en_uso" y guardamos cuándo entró realmente para cobrarle después
             update(ticketRef, { 
-                estado: "en_uso",
-                timestampIngresoFisico: ahora 
+                estado: "en_uso"
             }).then(() => {
                 mostrarEstado(`¡Código Válido!\nCajón asignado: ${ticket.cajon}.\nAvanza, abriendo pluma...`, "exito");
                 
