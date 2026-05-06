@@ -1,9 +1,8 @@
 // js/salida.js
-// Importamos las herramientas (usaremos 'set' para borrar poniendo el valor en null)
-import { db, ref, get, set } from './firebase-config.js';
+import { db, ref, get, set, firestoreDB, doc, setDoc } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Validar Sesión
+    // Validar Sesión de quien opera la terminal
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
     if (!usuarioLogueado) { window.location.href = '../index.html'; return; }
 
@@ -17,10 +16,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnValidar.addEventListener('click', () => {
         const codigoIngresado = inputCodigo.value.trim().toUpperCase();
-        
         if (codigoIngresado === '') { inputCodigo.focus(); return; }
 
-        // 1. Bloquear interfaz y mostrar loader
+        bloquearInterfaz("Verificando pago...");
+
+        const ticketRef = ref(db, 'tickets_activos/' + codigoIngresado);
+
+        get(ticketRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                mostrarError("Código no válido o el ticket ya fue procesado.");
+                return;
+            }
+
+            const ticket = snapshot.val();
+
+            // REGLA DE ORO: ¿Ya pagó en su celular?
+            if (ticket.estado !== "pagado") {
+                mostrarError("Aún no has liquidado tu estancia. Por favor paga desde tu app móvil.");
+                return;
+            }
+
+            // ¡ÉXITO! El cliente ya pagó. Procedemos con la Mudanza de Datos.
+            textoEstado.textContent = "Archivando ticket...";
+
+            // 1. Preparamos el documento para Firestore (Historial Histórico)
+            const historialRef = doc(firestoreDB, "historial_tickets", codigoIngresado);
+            const datosHistorial = {
+                ...ticket, // Copiamos toda la info del ticket original
+                fechaSalidaFisica: new Date().toLocaleString(),
+                estadoFinal: "completado"
+            };
+
+            // 2. Guardamos en Firestore
+            setDoc(historialRef, datosHistorial).then(() => {
+                
+                // 3. Borramos de la Realtime Database para liberar el cajón (Recolección de Basura)
+                return set(ticketRef, null);
+
+            }).then(() => {
+                
+                // 4. Mostramos éxito en la pantalla y abrimos pluma
+                mostrarExito("¡Buen viaje! Abriendo pluma...");
+                detalleCobro.classList.remove('oculto');
+                detalleCobro.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Cajón liberado:</span>
+                        <strong style="color: #FFFFFF;">${ticket.cajon}</strong>
+                    </div>
+                    <div style="text-align: center; margin-top: 15px; color: var(--spot-available); font-weight: bold;">
+                        Pago Confirmado en Nube
+                    </div>
+                `;
+
+                // Quitar el ticket del celular también (limpiar localstorage)
+                localStorage.removeItem('ticketActual');
+
+                setTimeout(() => {
+                    pantallaEstado.classList.add('oculto');
+                    reactivarInterfaz();
+                }, 4000);
+
+            }).catch(error => {
+                console.error("Error en la mudanza de datos:", error);
+                mostrarError("Error al archivar. Contacte administración.");
+            });
+
+        }).catch((error) => {
+            console.error("Error de conexión:", error);
+            mostrarError("Error de conexión. Intenta de nuevo.");
+        });
+    });
+
+    // --- Funciones UI auxiliares ---
+    function bloquearInterfaz(mensaje) {
         inputCodigo.disabled = true;
         btnValidar.disabled = true;
         pantallaEstado.classList.remove('oculto');
@@ -28,91 +96,27 @@ document.addEventListener('DOMContentLoaded', () => {
         iconoResultado.classList.add('oculto');
         detalleCobro.classList.add('oculto');
         textoEstado.className = '';
-        textoEstado.textContent = 'Calculando tarifa y verificando...';
-
-        // 2. Buscamos el ticket en Firebase
-        const ticketRef = ref(db, 'tickets_activos/' + codigoIngresado);
-
-        get(ticketRef).then((snapshot) => {
-            if (!snapshot.exists()) {
-                mostrarError("Código no válido o el ticket ya fue liquidado.");
-                reactivarInterfaz();
-                return;
-            }
-
-            const ticket = snapshot.val();
-
-            // Validación de seguridad: Tiene que haber entrado primero
-            if (ticket.estado !== "en_uso" || !ticket.timestampIngresoFisico) {
-                mostrarError("Error: Este código no ha registrado entrada en la pluma.");
-                reactivarInterfaz();
-                return;
-            }
-
-// --- LÓGICA DE COBRO MATEMÁTICA ---
-            const ahora = new Date().getTime();
-            const tiempoAdentroMilisegundos = ahora - ticket.timestampIngresoFisico;
-            
-            // TRUCO DE DESARROLLADOR: Convertimos milisegundos a "Minutos"
-            // (1 segundo de la vida real = 1 minuto en tu sistema)
-            const minutosRealesAdentro = Math.floor(tiempoAdentroMilisegundos / 1000);
-            
-            // Tu tarifa base es de $25 la hora. 
-            // Dividimos 25 / 60 para sacar cuánto cuesta cada minuto exacto:
-            const tarifaPorMinuto = 25.00 / 60; 
-            
-            // Se le cobra TODO el tiempo que estuvo adentro (el pago inicial fue solo por el apartado)
-            const totalAPagarSalida = minutosRealesAdentro * tarifaPorMinuto;
-
-            // 3. RECOLECCIÓN DE BASURA (Borrar el ticket de Firebase)
-            set(ticketRef, null).then(() => {
-                
-                // Mostrar éxito en la pantalla
-                mostrarExito("¡Liquidado! Abriendo pluma...");
-                detalleCobro.classList.remove('oculto');
-                
-                let htmlCobro = `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>Cajón liberado:</span>
-                        <strong style="color: #FFFFFF;">${ticket.cajon}</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>Tiempo de estancia:</span>
-                        <strong style="color: #FFFFFF;">${minutosRealesAdentro} min</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px;">
-                        <span>Total de Estacionamiento:</span>
-                        <strong style="color: #FF453A; font-size: 1.2rem;">$${totalAPagarSalida.toFixed(2)} MXN</strong>
-                    </div>
-                `;
-
-                detalleCobro.innerHTML = htmlCobro;
-
-                // Después de 5 segundos, limpiar todo por si viene el siguiente coche
-                setTimeout(() => {
-                    pantallaEstado.classList.add('oculto');
-                    reactivarInterfaz();
-                }, 5000);
-
-            });
-
-        }).catch((error) => {
-            console.error(error);
-            mostrarError("Error de conexión. Intenta de nuevo.");
-            reactivarInterfaz();
-        });
-    });
+        textoEstado.textContent = mensaje;
+    }
 
     function mostrarExito(mensaje) {
+        loader.classList.add('oculto');
+        iconoResultado.classList.remove('oculto');
         textoEstado.textContent = mensaje;
         textoEstado.classList.add('estado-exito');
         iconoResultado.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #32D74B;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
     }
 
     function mostrarError(mensaje) {
+        loader.classList.add('oculto');
+        iconoResultado.classList.remove('oculto');
         textoEstado.textContent = mensaje;
         textoEstado.classList.add('estado-error');
         iconoResultado.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #FF453A;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+        setTimeout(() => {
+            pantallaEstado.classList.add('oculto');
+            reactivarInterfaz();
+        }, 4000);
     }
 
     function reactivarInterfaz() {
