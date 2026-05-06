@@ -127,31 +127,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
+// Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
             clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
-            montoUI.style.color = "var(--danger-neon)";
             btnProcesar.disabled = false;
             
-            // Regresamos el botón a su color original por si venía de una multa
-            btnProcesar.textContent = "Pagar y Liberar Salida";
-            btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
-
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
                 const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
                 
-                const minutosReales = Math.floor(milisegundosAdentro / 1000);
+                // Simulación: dividimos entre 1000 para minutos rápidos de prueba
+                const minutosReales = Math.floor(milisegundosAdentro / 1000); 
                 
                 const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
                 const minutosUI = (minutosReales % 60).toString().padStart(2, '0');
                 relojUI.textContent = `${horasUI}:${minutosUI}`;
 
-                let horasACobrar = Math.max(1, Math.ceil(minutosReales / 60));
-                totalAPagar = horasACobrar * 25.00;
-                
-                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
-                
+                // ¡LA CORRECCIÓN!: ¿Cuánto tiempo compró en la entrada?
+                const minutosComprados = ticketFisico.minutosComprados || 0;
+
+                if (minutosReales <= minutosComprados) {
+                    // Aún está dentro de su tiempo pagado (¡ES GRATIS SALIR!)
+                    totalAPagar = 0;
+                    montoUI.style.color = "var(--success-neon)";
+                    montoUI.innerHTML = `$0.00 <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">Tiempo cubierto por tu paquete (${minutosComprados} min)</span>`;
+                    
+                    btnProcesar.textContent = "Generar Pase de Salida";
+                    btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
+                } else {
+                    // Ya se pasó de su paquete, empezamos a cobrarle TIEMPO EXTRA
+                    montoUI.style.color = "var(--danger-neon)";
+                    const minutosExtra = minutosReales - minutosComprados;
+                    let horasACobrar = Math.ceil(minutosExtra / 60);
+                    totalAPagar = horasACobrar * 25.00;
+                    
+                    montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr extra cobrada)</span>`;
+                    
+                    btnProcesar.textContent = `Pagar Tiempo Extra ($${totalAPagar.toFixed(2)})`;
+                    btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
+                }
             }, 1000);
         }
     });

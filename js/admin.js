@@ -37,10 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nombreCliente = ticket.nombre || "Cliente Web";
                 const placaCliente = ticket.placa || "N/A";
                 
-                let tiempoTexto = "-- min";
+                let tiempoTexto = "-- hrs";
                 if (ticket.timestampIngresoFisico && ticket.timestampSalida) {
                     const min = Math.ceil((ticket.timestampSalida - ticket.timestampIngresoFisico) / 60000);
-                    tiempoTexto = `${min} min`;
+                    tiempoTexto = `${min} hrs`;
                 }
 
                 // Armamos el texto visual del dinero
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let tiempoVivo = '<span style="color: var(--text-muted); font-size: 1.1rem;">Aún en tránsito</span>';
                     if (datos.timestampIngresoFisico) {
                         const minutos = Math.floor((new Date().getTime() - datos.timestampIngresoFisico) / 60000);
-                        tiempoVivo = `<span style="color: #FFFFFF; font-weight: bold; font-size: 1.4rem;">${minutos} <small style="font-size: 0.9rem; color: var(--text-muted);">min</small></span>`;
+                        tiempoVivo = `<span style="color: #FFFFFF; font-weight: bold; font-size: 1.4rem;">${minutos} <small style="font-size: 0.9rem; color: var(--text-muted);">hrs</small></span>`;
                     }
 
                     // Reconstruimos la tarjeta en bloques hacia abajo para que no se aplaste
