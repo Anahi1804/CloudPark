@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ticketRef = ref(db, 'tickets_activos/' + codigoTicket);
     
+    // AQUÍ EMPIEZA LA LECTURA DONDE VIVE "ticketFisico"
     onValue(ticketRef, (snapshot) => {
         const ticketFisico = snapshot.val();
 
@@ -59,70 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
-        if (ticketFisico.estado === "en_uso") {
-            
-            // Sub-caso C1: Aún no se ha estacionado (No hay timestamp)
-            if (!ticketFisico.timestampIngresoFisico) {
-                relojUI.textContent = "Manejando";
-                relojUI.style.fontSize = "2rem";
-                montoUI.innerHTML = `Dirígete al cajón ${ticketFisico.cajon}`;
-                btnProcesar.disabled = true;
-
-                // Empezamos a espiar al sensor del ESP32 para ver cuándo se estaciona
-                if (!hardwareListenerActivo) {
-                    hardwareListenerActivo = true;
-                    const equivalencias = {
-                        'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3',
-                        'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6'
-                    };
-                    const cajonIdHardware = equivalencias[ticketFisico.cajon];
-                    const sensorRef = ref(db, `estacionamiento_actual/${cajonIdHardware}`);
-                    
-                    // Escuchamos solo el sensor del cajón asignado
-                    onValue(sensorRef, (sensorSnap) => {
-                        const estadoCajon = sensorSnap.val();
-                        if (estadoCajon === "ocupado" && !ticketFisico.timestampIngresoFisico) {
-                            // ¡El ESP32 detectó el auto! Guardamos la hora de inicio en Firebase
-                            console.log("¡Auto detectado en el cajón! Iniciando reloj...");
-                            update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
-                        }
-                    });
-                }
-                return; // Pausamos aquí hasta que el hardware cambie
-            }
-
-            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
-            clearInterval(intervaloReloj); 
-            relojUI.style.fontSize = "3.5rem";
-            montoUI.style.color = "var(--danger-neon)";
-            btnProcesar.disabled = false;
-
-            intervaloReloj = setInterval(() => {
-                const ahora = new Date().getTime();
-                const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
-                
-                const minutosReales = Math.floor(milisegundosAdentro / 1000);
-                
-                const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
-                const minutosUI = (minutosReales % 60).toString().padStart(2, '0');
-                relojUI.textContent = `${horasUI}:${minutosUI}`;
-
-                // --- NUEVA MATEMÁTICA: COBRO POR HORA FRACCIONADA ---
-                // Math.ceil() redondea siempre hacia arriba. Ej: 1.1 horas = 2 horas a cobrar.
-                // Math.max(1, ...) asegura que mínimo se cobre 1 hora apenas te estacionas.
-                let horasACobrar = Math.max(1, Math.ceil(minutosReales / 60));
-                
-                // Si justo entra (minuto 0), horasACobrar será 1.
-                totalAPagar = horasACobrar * 25.00;
-                
-                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
-                
-            }, 1000);
-        }
-    });
-
-    // Caso D: El usuario fue MULTADO en la caseta de salida
+        // Caso D (LA MULTA): El usuario se tardó en salir y fue multado
         if (ticketFisico.estado === "multado") {
             clearInterval(intervaloReloj);
             relojUI.textContent = "MULTA";
@@ -136,8 +74,66 @@ document.addEventListener('DOMContentLoaded', () => {
             btnProcesar.disabled = false;
             btnProcesar.textContent = "Pagar Multa ($50.00)";
             btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
-            return; // Detenemos el código aquí
+            return;
         }
+
+        // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
+        if (ticketFisico.estado === "en_uso") {
+            // Sub-caso C1: Aún no se ha estacionado
+            if (!ticketFisico.timestampIngresoFisico) {
+                relojUI.textContent = "Manejando";
+                relojUI.style.fontSize = "2rem";
+                montoUI.innerHTML = `Dirígete al cajón ${ticketFisico.cajon}`;
+                btnProcesar.disabled = true;
+
+                if (!hardwareListenerActivo) {
+                    hardwareListenerActivo = true;
+                    const equivalencias = {
+                        'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3',
+                        'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6'
+                    };
+                    const cajonIdHardware = equivalencias[ticketFisico.cajon];
+                    const sensorRef = ref(db, `estacionamiento_actual/${cajonIdHardware}`);
+                    
+                    onValue(sensorRef, (sensorSnap) => {
+                        const estadoCajon = sensorSnap.val();
+                        if (estadoCajon === "ocupado" && !ticketFisico.timestampIngresoFisico) {
+                            console.log("¡Auto detectado en el cajón! Iniciando reloj...");
+                            update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
+            clearInterval(intervaloReloj); 
+            relojUI.style.fontSize = "3.5rem";
+            montoUI.style.color = "var(--danger-neon)";
+            btnProcesar.disabled = false;
+            
+            // Regresamos el botón a su color original por si venía de una multa
+            btnProcesar.textContent = "Pagar y Liberar Salida";
+            btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
+
+            intervaloReloj = setInterval(() => {
+                const ahora = new Date().getTime();
+                const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
+                
+                const minutosReales = Math.floor(milisegundosAdentro / 1000);
+                
+                const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
+                const minutosUI = (minutosReales % 60).toString().padStart(2, '0');
+                relojUI.textContent = `${horasUI}:${minutosUI}`;
+
+                let horasACobrar = Math.max(1, Math.ceil(minutosReales / 60));
+                totalAPagar = horasACobrar * 25.00;
+                
+                montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
+                
+            }, 1000);
+        }
+    });
 
     // Procesar el pago (Simulado)
     formPago.addEventListener('submit', (e) => {
@@ -149,9 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
             update(ticketRef, { 
                 estado: "pagado",
                 totalLiquidado: totalAPagar,
-                timestampPagado: new Date().getTime() // NUEVO: Sellamos la hora exacta
-            }).then(() => console.log("Pago registrado en la nube."));
+                timestampPagado: new Date().getTime() 
+            }).then(() => {
+                console.log("Pago registrado en la nube.");
+            });
         }, 2000);
-
     });
 });
