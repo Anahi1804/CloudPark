@@ -45,10 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ticket.timestampPagado && (ahora - ticket.timestampPagado) > limiteTolerancia) {
                 mostrarError("⏳ Tiempo de salida excedido. Se aplicará multa.");
                 
-                // CASTIGO: Le quitamos el estado "pagado", regresa a "multado" y borramos la hora de pago
+                // CASTIGO: Solo actualizamos el estado, dejamos intacto el timestampPagado
                 update(ticketRef, {
-                    estado: "multado",
-                    timestampPagado: null 
+                    estado: "multado" // <-- Eliminamos la línea que decía timestampPagado: null
                 });
                 
                 setTimeout(() => {
@@ -57,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 5000);
                 return; // Cortamos el proceso para que NO abra la pluma
             }
-
             // ¡ÉXITO! El cliente ya pagó. Procedemos con la Mudanza de Datos.
             textoEstado.textContent = "Archivando ticket...";
 
