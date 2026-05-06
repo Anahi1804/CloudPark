@@ -4,7 +4,7 @@ import { getDatabase, ref, onValue, set, update, get } from "https://www.gstatic
 // Agregamos onAuthStateChanged y signOut
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 // Agregamos getDoc
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB97Nlac70vu_rc_6XqCGPkfMa7rHCjkBk",
@@ -18,4 +18,5 @@ const auth = getAuth(app);
 const firestoreDB = getFirestore(app); 
 
 // Exportamos TODO
-export { db, auth, firestoreDB, ref, onValue, set, update, get, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, doc, setDoc, getDoc };
+export { db, auth, firestoreDB, ref, onValue, set, update, get, signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, onAuthStateChanged, signOut, doc, setDoc, getDoc, collection, getDocs };
