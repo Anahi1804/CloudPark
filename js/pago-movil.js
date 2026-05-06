@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnProcesar = document.getElementById('btn-procesar-pago');
 
     let totalAPagar = 0;
+    let historicoPagado = 0;
     let intervaloReloj;
     let hardwareListenerActivo = false;
 
@@ -33,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
             montoUI.innerHTML = `$0.00 <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span>`;
             return;
         }
+
+        historicoPagado = Number(ticketFisico.totalLiquidado) || 0;
 
         // Caso A: El usuario ya pagó el apartado, pero AÚN NO ENTRA por la pluma
         if (ticketFisico.estado === "reservado") {
@@ -160,13 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
-            // Sumamos lo que ya había pagado antes + la multa/recargo actual
-            const totalHistorico = (Number(ticketFisico.totalLiquidado) || 0) + totalAPagar;
+            // Usamos la variable global historicoPagado
+            const totalHistorico = historicoPagado + totalAPagar;
 
             update(ticketRef, { 
                 estado: "pagado",
                 totalLiquidado: totalHistorico,
-                timestampPagado: new Date().getTime() // Nuevo sello para darle 15 min extra
+                timestampPagado: new Date().getTime() 
             }).then(() => console.log("Pago registrado en la nube."));
         }, 2000);
     });

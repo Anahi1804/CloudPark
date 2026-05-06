@@ -44,13 +44,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. Guardar la compra en la Nube y en el Navegador
-    btnFinalizar.addEventListener('click', () => {
-        
+// 2. Guardar la compra en la Nube al ENVIAR el formulario
+    const formPagoEntrada = document.getElementById('form-pago-entrada');
+
+    formPagoEntrada.addEventListener('submit', (e) => {
+        e.preventDefault(); // Evita que la página recargue
+
         // Deshabilitamos el botón para que no le den doble clic
         btnFinalizar.disabled = true;
-        btnFinalizar.textContent = "Procesando pago...";
+        btnFinalizar.textContent = "Procesando pago con el banco...";
 
-        const codigoGenerado = generarCodigoReserva();
+        // Simulamos un retraso de procesamiento de banco de 2 segundos
+        setTimeout(() => {
+            const codigoGenerado = generarCodigoReserva(); 
+
+            const ahora = new Date();
+            const fechaExpiracion = new Date(ahora);
+            fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete);
+
+            const datosReserva = {
+                usuario: usuarioLogueado,
+                nombre: localStorage.getItem('nombreUsuario') || "Usuario",
+                placa: localStorage.getItem('placaUsuario') || "S/N",
+                cajon: cajonSeleccionado,
+                paquete: nombrePaquete,
+                minutosComprados: minutosPaquete,
+                totalLiquidado: precioSeleccionado, // Usamos totalLiquidado para unificar la economía
+                totalPagado: precioSeleccionado, // (Dejamos este por compatibilidad del diseño del ticket)
+                codigo: codigoGenerado,
+                timestampCompra: ahora.getTime(), 
+                timestampExpiracion: fechaExpiracion.getTime(),
+                fechaTexto: ahora.toLocaleString(),
+                estado: "reservado" 
+            };
+
+            const ticketRef = ref(db, 'tickets_activos/' + codigoGenerado);
+
+            set(ticketRef, datosReserva)
+                .then(() => {
+                    localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
+                    localStorage.removeItem('cajonTemporal');
+                    window.location.href = 'ticket.html';
+                })
+                .catch((error) => {
+                    console.error("Error al guardar en Firebase:", error);
+                    alert("Hubo un error de conexión. Intenta de nuevo.");
+                    btnFinalizar.disabled = false;
+                    btnFinalizar.textContent = "Pagar y Generar Código";
+                });
+        }, 2000); // 2 segundos de "Loading" falso
+    });
         
 // --- INICIO CÁLCULO DE TIEMPO (MODO PRUEBAS) ---
         const ahora = new Date();

@@ -57,6 +57,20 @@
                     <span class="etiqueta-total">Total a pagar hoy:</span>
                     <strong id="monto-total" class="monto-neon">$0.00 MXN</strong>
                 </div>
+
+                <!-- NUEVO: Formulario de pago para la reserva -->
+                <form id="form-pago-entrada" onsubmit="event.preventDefault();" style="margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 0.8rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase;">Método de Pago</h4>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem;">
+                        <input type="text" placeholder="Nombre en la tarjeta" required style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; width: 100%; box-sizing: border-box; outline: none;">
+                        <input type="text" placeholder="0000 0000 0000 0000" maxlength="19" required style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; width: 100%; box-sizing: border-box; outline: none;">
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" placeholder="MM/AA" maxlength="5" required style="width: 50%; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; box-sizing: border-box; outline: none;">
+                            <input type="text" placeholder="CVV" maxlength="4" required style="width: 50%; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; box-sizing: border-box; outline: none;">
+                        </div>
+                    </div>
+                    <button type="submit" id="btn-finalizar" class="btn-neon" disabled>Pagar y Generar Código</button>
+                </form>
                 
                 <button id="btn-finalizar" class="btn-neon" disabled>Pagar y Generar Código</button>
             </section>
