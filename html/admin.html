@@ -31,24 +31,30 @@
         </div>
 
         <div class="admin-grid">
-            <!-- Columna Izquierda: Mapa Físico (Simulado visualmente por ahora) -->
+            <!-- Columna Izquierda: Mapa Físico -->
             <section>
-                <h2 style="font-size: 1.2rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;">Monitor de Cajones</h2>
-                <div class="stats-card" style="margin-top: 1rem;">
-                    <p style="color: var(--text-muted);">Aquí inyectaremos el mapa en vivo de la Realtime Database para ver quién ocupa qué lugar.</p>
-                    <div id="admin-mapa-container"></div>
+                <h2>Monitor de Cajones</h2>
+                <div class="stats-card" style="margin-top: 1rem; padding: 1.5rem;">
+                    <!-- Aquí el JS reescribirá todo el contenido -->
+                    <div id="admin-mapa-container">
+                        <p style="color: var(--text-muted); font-size: 0.9rem;">Sincronizando sensores con la nube...</p>
+                    </div>
                 </div>
             </section>
 
             <!-- Columna Derecha: Detalle del Vehículo -->
             <section>
-                <h2 style="font-size: 1.2rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;">Inspección de Vehículo</h2>
-                <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left;">
-                    <p style="color: var(--text-muted); text-align: center;">Haz clic en un cajón ocupado para ver los datos del cliente y su placa.</p>
+                <h2>Inspección de Vehículo</h2>
+                <!-- Le dimos una altura mínima y centramos el texto para que no se vea aplastado cuando esté vacío -->
+                <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left; min-height: 180px; display: flex; align-items: center; justify-content: center;">
+                    <p style="color: var(--text-muted); text-align: center; margin: 0;">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px; opacity: 0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <br>
+                        Haz clic en un cajón ocupado<br>para espiar los datos.
+                    </p>
                 </div>
             </section>
         </div>
-
         <!-- Tabla del Historial de Firestore -->
         <section style="margin-top: 3rem;">
             <h2>Registro Histórico de Pagos</h2>
