@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
+// Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
             clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
             montoUI.style.color = "var(--danger-neon)";
@@ -152,7 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
-                const milisegundosAdentro = ahora - ticketFisico.timestampIngresoFisico;
+                
+                // FIX DEL "-1": Usamos Math.max(0, ...) para evitar números negativos si hay desincronización
+                const milisegundosAdentro = Math.max(0, ahora - ticketFisico.timestampIngresoFisico);
                 
                 const minutosReales = Math.floor(milisegundosAdentro / 1000);
                 
@@ -169,37 +172,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-// Procesar el pago (Simulado)
+    // Procesar el pago (Código Limpio sin variables duplicadas)
     formPago.addEventListener('submit', (e) => {
         e.preventDefault();
         btnProcesar.disabled = true;
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
-            // 1. Iniciamos con lo que ya tenía guardado en la base de datos
             let nuevoEstacionamiento = historicoEstacionamiento;
             let nuevoMulta = historicoMulta;
             
-            // 2. Acomodamos el dinero nuevo en la cajita correcta
             if (esPagoMulta) {
-                nuevoMulta += totalAPagar;     
+                nuevoMulta += totalAPagar; // Lo mete a la caja de multas     
             } else {
-                nuevoEstacionamiento += totalAPagar; 
+                nuevoEstacionamiento += totalAPagar; // Lo mete a la caja de tiempo normal
             }
 
-            // 3. Calculamos la suma de todo (Reserva + Tiempo + Multas)
             const totalHistorico = historicoReserva + nuevoEstacionamiento + nuevoMulta;
 
-            // 4. Guardamos todo desglosado en la nube
             update(ticketRef, { 
                 estado: "pagado",
                 pagoEstacionamiento: nuevoEstacionamiento,
                 pagoMulta: nuevoMulta,
                 granTotal: totalHistorico,
                 timestampPagado: new Date().getTime() 
-            }).then(() => {
-                console.log("Pago registrado con desglose perfecto.");
-            });
+            }).then(() => console.log("Pago registrado con desglose perfecto."));
         }, 2000);
     });
-}); // <--- Cierre del DOMContentLoaded
+}); // Cierre del DOMContentLoaded
