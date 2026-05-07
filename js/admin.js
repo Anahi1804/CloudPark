@@ -87,8 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarHistorial();
 
     // --- 3. REALTIME DB: Monitor de Cajones en Vivo ---
-// --- 3. REALTIME DB: Monitor de Cajones en Vivo ---
-// --- 3. REALTIME DB: Dibujar el Mapa (Cajones Base) ---
     const ticketsRef = ref(db, 'tickets_activos');
     let cajonesOcupados = {}; // Variable global para guardar info
     
@@ -175,14 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const datos = await respuesta.json();
                 
                 if (datos.status === "success") {
-                    alert("✅ RESPUESTA DEL SERVIDOR RMI (PYRO4):\n\n" + datos.data);
+                    alert("RESPUESTA DEL SERVIDOR:\n\n" + datos.data);
                 } else {
-                    alert("❌ Error en RMI:\n" + datos.data);
+                    alert("Error en RMI:\n" + datos.data);
                 }
             } catch (e) {
-                alert("⚠️ No se pudo conectar. ¿Tienes encendido el puente_rmi.py en tu computadora?");
+                alert("⚠️ No se pudo conectar.");
             }
-            btnRMI.textContent = "Auditoría Remota (RMI)";
+            btnRMI.textContent = "Auditoría Remota";
         });
     }
 
