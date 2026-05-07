@@ -169,41 +169,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Procesar el pago (Simulado)
+// Procesar el pago (Simulado)
     formPago.addEventListener('submit', (e) => {
         e.preventDefault();
         btnProcesar.disabled = true;
         btnProcesar.textContent = "Procesando con banco...";
 
-    setTimeout(() => {
-            const totalHistorico = historicoPagado + totalAPagar;
+        setTimeout(() => {
+            // 1. Iniciamos con lo que ya tenía guardado en la base de datos
+            let nuevoEstacionamiento = historicoEstacionamiento;
+            let nuevoMulta = historicoMulta;
             
-            let nuevoLiquidado = historicoPagado;
-            let nuevoRecargo = 0;
-            
+            // 2. Acomodamos el dinero nuevo en la cajita correcta
             if (esPagoMulta) {
-                // Si es multa: el dinero original se queda intacto, y guardamos la multa
-                nuevoLiquidado = historicoPagado; 
-                nuevoRecargo = totalAPagar;       
+                nuevoMulta += totalAPagar;     
             } else {
-                // Si es pago normal: lo sumamos a su cuenta limpia
-                nuevoLiquidado = historicoPagado + totalAPagar; 
-                nuevoRecargo = 0;
+                nuevoEstacionamiento += totalAPagar; 
             }
 
-            if (esPagoMulta) {
-                nuevoMulta += totalAPagar; // Lo mete a la caja de multas     
-            } else {
-                nuevoEstacionamiento += totalAPagar; // Lo mete a la caja de tiempo normal
-            }
+            // 3. Calculamos la suma de todo (Reserva + Tiempo + Multas)
+            const totalHistorico = historicoReserva + nuevoEstacionamiento + nuevoMulta;
 
+            // 4. Guardamos todo desglosado en la nube
             update(ticketRef, { 
                 estado: "pagado",
-                totalLiquidado: nuevoLiquidado, // Guarda el dinero limpio
-                recargoMulta: nuevoRecargo,     // Guarda solo si hubo trampa
-                granTotal: totalHistorico,      // La suma de todo
+                pagoEstacionamiento: nuevoEstacionamiento,
+                pagoMulta: nuevoMulta,
+                granTotal: totalHistorico,
                 timestampPagado: new Date().getTime() 
-            }).then(() => console.log("Pago registrado y desglosado en la nube."));
+            }).then(() => {
+                console.log("Pago registrado con desglose perfecto.");
+            });
         }, 2000);
     });
-});
+}); // <--- Cierre del DOMContentLoaded
