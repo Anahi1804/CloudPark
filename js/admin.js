@@ -129,6 +129,37 @@ document.addEventListener('DOMContentLoaded', () => {
         htmlMapa += `</div>`;
         mapaContainer.innerHTML = htmlMapa;
 
+        // --- MAPA EN TIEMPO REAL (SENSORES FÍSICOS) ---
+    const equivalenciasSensores = {
+        'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3',
+        'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3'
+    };
+
+    const sensoresRef = ref(db, 'estacionamiento_actual');
+    
+    onValue(sensoresRef, (snapshot) => {
+        const sensores = snapshot.val();
+        if (!sensores) return;
+
+        // Recorremos los 6 cajones de Firebase
+        for (const [idSensor, estado] of Object.entries(sensores)) {
+            const nombreCajon = equivalenciasSensores[idSensor];
+            
+            // Buscamos el cajón visual en la pantalla del admin (Asegúrate de que los IDs en admin.html coincidan, ej: 'cajon-A1')
+            const cajonUI = document.getElementById(`cajon-${nombreCajon}`);
+            
+            if (cajonUI) {
+                if (estado === "ocupado") {
+                    cajonUI.style.backgroundColor = "var(--danger-neon)"; // Rojo si hay auto
+                    cajonUI.style.boxShadow = "0 0 10px var(--danger-neon)";
+                } else {
+                    cajonUI.style.backgroundColor = "var(--spot-available)"; // Verde si está libre
+                    cajonUI.style.boxShadow = "none";
+                }
+            }
+        }
+    });
+
         // 4. Agregar la función de "Espiar" al hacer clic (¡Con UI arreglada!)
         document.querySelectorAll('.cajon-admin').forEach(btn => {
             btn.addEventListener('click', () => {
