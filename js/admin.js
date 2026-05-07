@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // Extraemos los pagos desglosados
                 const pagoBase = Number(ticket.totalLiquidado) || 0;
                 const pagoMulta = Number(ticket.recargoMulta) || 0;
-                const granTotal = Number(ticket.granTotal) || (pagoBase + pagoMulta);
                 const reserva = Number(ticket.pagoReserva) || 0;
                 const tiempo = Number(ticket.pagoEstacionamiento) || 0;
                 const multa = Number(ticket.pagoMulta) || 0;
