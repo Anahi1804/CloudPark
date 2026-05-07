@@ -26,17 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
             querySnapshot.forEach((doc) => {
                 const ticket = doc.data(); // AQUÍ nace la variable ticket
                 totalTickets++;
-// Extraemos los pagos desglosados
-                const pagoBase = Number(ticket.totalLiquidado) || 0;
-                const pagoMulta = Number(ticket.recargoMulta) || 0;
+// Extraemos las cajas separadas sin duplicar variables
                 const reserva = Number(ticket.pagoReserva) || 0;
                 const tiempo = Number(ticket.pagoEstacionamiento) || 0;
                 const multa = Number(ticket.pagoMulta) || 0;
-                const granTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
-
+                const sumaTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
 
                 totalTickets++;
-                totalDinero += granTotal; // Sumamos el Gran Total a las ganancias de hoy
+                totalDinero += sumaTotal; // Sumamos a las ganancias de hoy
+
 
                 const nombreCliente = ticket.nombre || "Cliente Web";
                 const placaCliente = ticket.placa || "N/A";
@@ -47,8 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     tiempoTexto = `${min} hrs`;
                 }
 
-// Armamos el texto visual del dinero con un súper detalle
-                let uiDinero = `<strong style="color: var(--success-neon); font-size: 1.1rem;">$${granTotal.toFixed(2)}</strong><br>`;
+// Armamos el texto visual del dinero (El recibo desglosado)
+                let uiDinero = `<strong style="color: var(--success-neon); font-size: 1.1rem;">$${sumaTotal.toFixed(2)}</strong><br>`;
                 uiDinero += `<span style="font-size: 0.75rem; color: var(--text-muted);">Reserva: $${reserva.toFixed(2)}</span><br>`;
                 
                 if (tiempo > 0) {
