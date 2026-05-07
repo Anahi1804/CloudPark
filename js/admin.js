@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const multa = Number(ticket.pagoMulta) || 0;
                 const granTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
 
+
                 totalTickets++;
                 totalDinero += granTotal; // Sumamos el Gran Total a las ganancias de hoy
 
