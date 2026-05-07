@@ -1,0 +1,323 @@
+/* css/ticket.css */
+
+:root {
+    --bg-app: #000000;            
+    --surface-dark: #1C1C1E;      
+    --surface-hover: #2C2C2E;
+    --border-dark: rgba(255, 255, 255, 0.08);
+    
+    --text-main: #FFFFFF;
+    --text-muted: #8E8E93;
+    
+    --spot-selected: #0A84FF;
+    --glow-primary: rgba(10, 132, 255, 0.4);
+}
+
+body {
+    background-color: var(--bg-app) !important;
+    color: var(--text-main);
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.layout-fluido, .mobile-container {
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: var(--bg-app) !important;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Dark Premium */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2.5rem 1.5rem 1rem;
+    position: sticky;
+    top: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 10;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.header-titulo {
+    text-align: center;
+}
+
+.header-titulo h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.header-titulo p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--spot-selected);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+}
+
+.btn-volver {
+    background: var(--surface-dark);
+    border: 1px solid var(--border-dark);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-volver:active {
+    background: var(--surface-hover);
+    transform: scale(0.92);
+}
+
+/* Contenedor del Ticket */
+.layout-ticket {
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+}
+
+/* Estilo del Pase Digital (Wallet style) */
+.ticket-premium {
+    background: var(--surface-dark);
+    width: 100%;
+    border-radius: 24px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.8);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Resplandor superior sutil */
+.ticket-premium::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #0A84FF, #32D74B);
+}
+
+.ticket-header-interno {
+    padding: 1.5rem 1.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-dark);
+    background: rgba(255,255,255,0.02);
+}
+
+.logo-ticket {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.logo-ticket svg {
+    color: var(--spot-selected);
+}
+
+#tkt-fecha {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.ticket-cuerpo {
+    padding: 1.5rem;
+}
+
+.fila-detalle {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.etiqueta-detalle {
+    color: var(--text-muted);
+}
+
+.valor-detalle {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.highlight {
+    color: var(--spot-selected);
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+
+/* Divisor con efecto de ticket cortado */
+.divisor-cortado {
+    position: relative;
+    margin: 1.5rem 0;
+    height: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.linea-punteada {
+    width: 100%;
+    border-top: 2px dashed rgba(255,255,255,0.15);
+}
+
+/* Círculos a los lados simulando la muesca de un ticket físico */
+.muesca {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: var(--bg-app);
+    border-radius: 50%;
+    top: 0;
+}
+
+.muesca.izquierda {
+    left: -25px;
+    box-shadow: inset -2px 0 5px rgba(0,0,0,0.5);
+}
+
+.muesca.derecha {
+    right: -25px;
+    box-shadow: inset 2px 0 5px rgba(0,0,0,0.5);
+}
+
+/* Sección del PIN Súper Resaltada */
+.seccion-pin {
+    text-align: center;
+    background: #000000;
+    padding: 2rem 1rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-dark);
+    margin: 1rem 0;
+}
+
+.pin-instruccion {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    margin-top: 0;
+    margin-bottom: 0.8rem;
+}
+
+.pin-codigo {
+    font-size: 2.2rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 900;
+    color: #FFFFFF;
+    letter-spacing: 4px;
+}
+
+.neon-text {
+    text-shadow: 0 0 15px rgba(10, 132, 255, 0.8), 0 0 30px rgba(10, 132, 255, 0.4);
+}
+
+.total-ticket {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.etiqueta-total {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+}
+
+.monto-total {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--spot-selected);
+}
+
+/* Botones de acción inferiores */
+.acciones-finales {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.btn-neon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: linear-gradient(135deg, #0A84FF 0%, #005BB5 100%);
+    color: #FFFFFF;
+    border: none;
+    padding: 1.2rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(10, 132, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-neon:active {
+    transform: scale(0.96);
+}
+
+.btn-secundario {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-dark);
+    padding: 1.2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secundario:active {
+    background: var(--surface-dark);
+    transform: scale(0.96);
+}
+
+/* Optimización para impresión (PDF/Papel) en fondo claro para ahorrar tinta */
+@media print {
+    body { background-color: white !important; color: black; }
+    .mobile-container { background-color: white !important; }
+    .app-header, .acciones-finales { display: none; }
+    .ticket-premium {
+        background: white;
+        border: 2px solid #ccc;
+        box-shadow: none;
+        color: black;
+    }
+    .ticket-premium::before { display: none; }
+    .valor-detalle, .logo-ticket, .monto-total, .pin-codigo { color: black; }
+    .seccion-pin { background: #f9f9f9; border: 2px dashed #ccc; }
+    .neon-text { text-shadow: none; }
+    .muesca { background-color: white; border-right: 2px solid #ccc; }
+    .muesca.derecha { border-right: none; border-left: 2px solid #ccc; }
+    .linea-punteada { border-top-color: #ccc; }
+}   

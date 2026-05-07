@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pago Móvil - CloudPark</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/pago-movil.css">
+</head>
+<body class="bg-app">
+    <main class="mobile-container">
+        
+        <header class="app-header">
+            <a href="dashboard.html" class="btn-volver">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </a>
+            <div class="header-titulo">
+                <h2>Caja Virtualk</h2>
+                <p>Liquidar Estancia</p>
+            </div>
+            <div style="width: 40px;"></div>
+        </header>
+
+        <section class="panel-monitoreo">
+            <p class="etiqueta-tiempo">Tiempo Estacionado</p>
+            <div id="reloj-tiempo" class="reloj-neon">00:00</div>
+            
+            <div class="monto-pagar" id="monto-total">
+                $0.00 <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span>
+            </div>
+        </section>
+
+        <form id="form-pago-simulado" class="formulario-pago" onsubmit="event.preventDefault();">
+            <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Datos de Pago</h3>
+            
+            <input type="text" class="input-tarjeta" placeholder="Nombre en la tarjeta" required>
+            
+            <input type="text" class="input-tarjeta" placeholder="0000 0000 0000 0000" maxlength="19" required>
+            
+            <div class="fila-inputs">
+                <input type="text" class="input-tarjeta" placeholder="MM/AA" maxlength="5" required>
+                <input type="text" class="input-tarjeta" placeholder="CVV" maxlength="4" required>
+            </div>
+
+            <button type="submit" id="btn-procesar-pago" class="btn-pagar">Pagar y Liberar Salida</button>
+        </form>
+
+    </main>
+
+    <script type="module" src="../js/pago-movil.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Acceso al Estacionamiento - CloudPark</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/caseta.css">
+</head>
+<body class="body-terminal">
+    <main class="contenedor-terminal">
+        <header class="header-terminal">
+            <div class="logo-terminal">CloudPark</div>
+            <h1>Caseta de Entrada</h1>
+            <p>Ingresa el código de tu ticket para abrir la pluma</p>
+        </header>
+
+        <section class="seccion-validacion">
+            <div class="campo-codigo">
+                <label for="codigo-input">Código de Reservación:</label>
+                <input type="text" id="codigo-input" placeholder="PARK-XXXX" autocapitalize="characters" autocomplete="off" maxlength="10">
+            </div>
+
+            <button id="btn-validar" class="btn-accion btn-grande">Validar y Abrir Pluma</button>
+            <div style="text-align: center; margin-top: 20px;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">¿Aún no tienes reserva? </span>
+                <br>
+                <a href="../index.html" style="color: var(--spot-available); text-decoration: none; font-weight: bold; font-size: 0.95rem; display: inline-block; margin-top: 5px; transition: 0.3s;">
+                    👉 Inicia sesión o regístrate aquí
+                </a>
+            </div>
+        </section>
+
+        <div id="mensaje-estado" class="mensaje-terminal oculto">
+            <div class="icono-estado"></div>
+            <p id="texto-estado"></p>
+        </div>
+    </main>
+
+    <script type="module" src="../js/acceso-entrada.js"></script>
+</body>
+</html>

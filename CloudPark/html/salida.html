@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Salida - CloudPark</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/salida.css">
+</head>
+<body class="bg-app">
+    <main class="mobile-container layout-salida">
+        
+        <header class="app-header">
+            <a href="dashboard.html" class="btn-volver" title="Volver al inicio">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </a>
+            <div class="header-titulo">
+                <h2>Caseta de Salida</h2>
+                <p>Check-out</p>
+            </div>
+            <div style="width: 40px;"></div> 
+        </header>
+
+        <div class="contenedor-terminal">
+            
+            <div class="icono-terminal">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18v-2a4 4 0 0 1 4-4h12"></path><polyline points="16 8 20 12 16 16"></polyline><line x1="4" y1="22" x2="4" y2="18"></line></svg>
+            </div>
+
+            <h3 class="titulo-terminal">Liquidar y Salir</h3>
+            <p class="instruccion-terminal">Ingresa tu código de acceso para verificar tu estancia y abrir la pluma.</p>
+
+            <div class="campo-input">
+                <input type="text" id="codigo-salida" placeholder="PARK-XXXX" autocapitalize="characters" autocomplete="off" maxlength="10">
+            </div>
+
+            <button id="btn-validar-salida" class="btn-neon">Verificar Salida</button>
+
+            <div id="pantalla-hardware" class="pantalla-estado oculto">
+                <div class="loader" id="loader-hardware"></div>
+                <div id="icono-estado" class="icono-resultado oculto"></div>
+                <p id="texto-estado">Conectando con el servidor...</p>
+                <div id="detalle-cobro" class="detalle-cobro oculto">
+                    </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script type="module" src="../js/salida.js"></script>
+</body>
+</html>
