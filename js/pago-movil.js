@@ -36,6 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // NUEVO: Leemos las 3 cajitas financieras
+        let historicoReserva = Number(ticketFisico.pagoReserva) || 0;
+        let historicoEstacionamiento = Number(ticketFisico.pagoEstacionamiento) || 0;
+        let historicoMulta = Number(ticketFisico.pagoMulta) || 0;
+
         historicoPagado = Number(ticketFisico.totalLiquidado) || 0;
 
         // Caso A: El usuario ya pagó el apartado, pero AÚN NO ENTRA por la pluma
@@ -179,6 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Si es pago normal: lo sumamos a su cuenta limpia
                 nuevoLiquidado = historicoPagado + totalAPagar; 
                 nuevoRecargo = 0;
+            }
+
+            if (esPagoMulta) {
+                nuevoMulta += totalAPagar; // Lo mete a la caja de multas     
+            } else {
+                nuevoEstacionamiento += totalAPagar; // Lo mete a la caja de tiempo normal
             }
 
             update(ticketRef, { 

@@ -69,6 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 cajon: cajonSeleccionado,
                 paquete: nombrePaquete,
                 minutosComprados: minutosPaquete,
+
+                // NUEVO DESGLOSE FINANCIERO:
+                pagoReserva: precioSeleccionado, 
+                pagoEstacionamiento: 0,
+                pagoMulta: 0,
+                granTotal: precioSeleccionado,
+
                 totalLiquidado: precioSeleccionado, // Usamos totalLiquidado para unificar la economía
                 totalPagado: precioSeleccionado, // (Dejamos este por compatibilidad del diseño del ticket)
                 codigo: codigoGenerado,

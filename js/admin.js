@@ -30,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pagoBase = Number(ticket.totalLiquidado) || 0;
                 const pagoMulta = Number(ticket.recargoMulta) || 0;
                 const granTotal = Number(ticket.granTotal) || (pagoBase + pagoMulta);
+                const reserva = Number(ticket.pagoReserva) || 0;
+                const tiempo = Number(ticket.pagoEstacionamiento) || 0;
+                const multa = Number(ticket.pagoMulta) || 0;
+                const granTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
 
                 totalTickets++;
                 totalDinero += granTotal; // Sumamos el Gran Total a las ganancias de hoy
@@ -43,10 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     tiempoTexto = `${min} hrs`;
                 }
 
-                // Armamos el texto visual del dinero
-                let uiDinero = `<span style="color: var(--success-neon);">$${pagoBase.toFixed(2)}</span>`;
-                if (pagoMulta > 0) {
-                    uiDinero += `<br><span style="font-size: 0.8rem; color: var(--danger-neon);">+ $${pagoMulta.toFixed(2)} multa</span>`;
+// Armamos el texto visual del dinero con un súper detalle
+                let uiDinero = `<strong style="color: var(--success-neon); font-size: 1.1rem;">$${granTotal.toFixed(2)}</strong><br>`;
+                uiDinero += `<span style="font-size: 0.75rem; color: var(--text-muted);">Reserva: $${reserva.toFixed(2)}</span><br>`;
+                
+                if (tiempo > 0) {
+                    uiDinero += `<span style="font-size: 0.75rem; color: var(--text-muted);">Tiempo: $${tiempo.toFixed(2)}</span><br>`;
+                }
+                if (multa > 0) {
+                    uiDinero += `<span style="font-size: 0.75rem; color: var(--danger-neon);">Multa: +$${multa.toFixed(2)}</span>`;
                 }
 
                 htmlTabla += `
@@ -55,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><strong>${nombreCliente}</strong><br><span style="font-size: 0.8rem; color: var(--text-muted);">${placaCliente}</span></td>
                         <td><strong>${ticket.cajon}</strong></td>
                         <td>${tiempoTexto}</td>
-                        <td style="font-weight: bold;">${uiDinero}</td>
+                        <td>${uiDinero}</td>
                         <td><span class="badge-pagado">Completado</span></td>
                     </tr>
                 `;
