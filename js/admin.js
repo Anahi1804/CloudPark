@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 5. PARCHE DE SERVIDOR: El Admin vigila los sensores físicos ---
     // Esto resuelve el problema de depender del celular del usuario (Fase 3)
+    /*
     const hardwareRef = ref(db, 'estacionamiento_actual');
     onValue(hardwareRef, async (sensorSnap) => {
         const sensores = sensorSnap.val() || {};
@@ -197,5 +198,5 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-    });
+    });*/
 });
