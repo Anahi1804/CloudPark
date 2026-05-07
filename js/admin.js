@@ -210,26 +210,4 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
     }
-    // --- CONEXIÓN RMI ---
-    const btnRMI = document.getElementById('btn-auditoria-rmi');
-    if (btnRMI) {
-        btnRMI.addEventListener('click', async () => {
-            btnRMI.textContent = "Procesando RMI...";
-            try {
-                // Toca la puerta de tu traductor local invisible
-                const respuesta = await fetch('http://localhost:8000');
-                const json = await respuesta.json();
-                
-                if (json.status === "success") {
-                    // Muestra el resultado como si fuera parte de la página web
-                    alert("✅ COMUNICACIÓN RMI EXITOSA:\n\n" + json.data);
-                } else {
-                    alert("❌ Error: " + json.data);
-                }
-            } catch (e) {
-                alert("⚠️ Error: ¿Olvidaste encender los scripts ocultos antes de la presentación?");
-            }
-            btnRMI.textContent = "🔍 Ejecutar Auditoría (RMI)";
-        });
-    }
 });
