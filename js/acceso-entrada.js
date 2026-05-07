@@ -1,6 +1,6 @@
 // js/acceso-entrada.js
 // 1. Importamos las herramientas, incluyendo 'get' para leer una sola vez y 'update' para actualizar datos
-import { db, ref, get, update } from './firebase-config.js';
+import { db, ref, get, update, set } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const inputCodigo = document.getElementById('codigo-input');
