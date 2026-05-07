@@ -23,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let hardwareListenerActivo = false;
     let esPagoMulta = false;
 
+    // NUESTRAS 3 CAJITAS GLOBALES:
+    let historicoReserva = 0;
+    let historicoEstacionamiento = 0;
+    let historicoMulta = 0;
+
     const ticketRef = ref(db, 'tickets_activos/' + codigoTicket);
     
     // AQUÍ EMPIEZA LA LECTURA DONDE VIVE "ticketFisico"
@@ -37,9 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // NUEVO: Leemos las 3 cajitas financieras
-        let historicoReserva = Number(ticketFisico.pagoReserva) || 0;
-        let historicoEstacionamiento = Number(ticketFisico.pagoEstacionamiento) || 0;
-        let historicoMulta = Number(ticketFisico.pagoMulta) || 0;
+        historicoReserva = Number(ticketFisico.pagoReserva) || 0;
+        historicoEstacionamiento = Number(ticketFisico.pagoEstacionamiento) || 0;
+        historicoMulta = Number(ticketFisico.pagoMulta) || 0;
 
         historicoPagado = Number(ticketFisico.totalLiquidado) || 0;
 
