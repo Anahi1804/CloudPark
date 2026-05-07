@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return set(ticketRef, null);
 
             }).then(() => {
+
+                // 🦾 ¡LA MAGIA: Mandamos la orden al motor de SALIDA!
+                set(ref(db, 'control_plumas/salida'), 'abrir');
                 
                 // 4. Mostramos éxito en la pantalla y abrimos pluma
                 mostrarExito("¡Buen viaje! Abriendo pluma...");

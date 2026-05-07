@@ -64,12 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }).then(() => {
                 mostrarEstado(`¡Código Válido!\nCajón asignado: ${ticket.cajon}.\nAvanza, abriendo pluma...`, "exito");
                 
+                // 🦾 ¡LA MAGIA: Mandamos la orden al motor de ENTRADA!
+                set(ref(db, 'control_plumas/entrada'), 'abrir');
+
                 // Limpiamos el input
                 inputCodigo.value = "";
                 reactivarBoton();
-
-                // NOTA FUTURA PARA EL RMI/PYTHON:
-                // Justo aquí es donde Python le enviaría la señal eléctrica al ESP32 para abrir el servomotor.
             });
 
         }).catch((error) => {
