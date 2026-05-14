@@ -7,24 +7,47 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/auth.css">
     <style>
+        /* Optimizaciones Responsivas Nativas */
         .seccion-perfil {
             background: var(--surface);
             border: 1px solid var(--border-dark);
             border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
+        
         .titulo-seccion {
-            font-size: 1.1rem; color: #fff; margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;
+            font-size: 1.1rem; 
+            color: #fff; 
+            margin-top: 0; 
+            margin-bottom: 1.2rem; 
+            border-bottom: 1px solid var(--border-dark); 
+            padding-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Ajustes para celulares muy pequeños */
+        @media (max-width: 380px) {
+            .seccion-perfil {
+                padding: 1rem; /* Reduce márgenes internos */
+            }
+            .input-con-icono input {
+                font-size: 1rem; /* Evita zoom automático en iOS */
+                padding: 1rem 1rem 1rem 2.8rem; 
+            }
+            .header-titulo h2 {
+                font-size: 1.15rem !important;
+            }
         }
     </style>
 </head>
 <body class="bg-app">
     <main class="mobile-container layout-fluido">
         
-        <header class="app-header" style="padding: 2.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border-dark);">
+        <header class="app-header" style="padding: 2rem 1.2rem 1rem; border-bottom: 1px solid var(--border-dark);">
             <a href="dashboard.html" class="btn-volver" title="Volver al inicio" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-dark); background: var(--surface); color: white; text-decoration: none;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </a>
             <div class="header-titulo" style="text-align: center;">
                 <h2 style="margin: 0; font-size: 1.3rem; color: white;">Mi Perfil</h2>
@@ -33,36 +56,40 @@
             <div style="width: 40px;"></div> 
         </header>
 
-        <div style="padding: 1.5rem;">
+        <div style="padding: 1.2rem;">
             <section class="seccion-perfil">
                 <h3 class="titulo-seccion">Mis Datos</h3>
                 <form id="form-editar-perfil" class="form-dark" onsubmit="event.preventDefault();">
                     
                     <div class="campo-input-wrapper">
-                        <label>Nombre Completo</label>
+                        <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">NOMBRE COMPLETO</label>
                         <div class="input-con-icono">
                             <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            <input type="text" id="edit-nombre" required>
+                            <input type="text" id="edit-nombre" required style="width: 100%; box-sizing: border-box;">
                         </div>
                     </div>
 
-                    <div class="campo-input-wrapper" style="margin-top: 1rem;">
-                        <label>Placa Principal</label>
+                    <div class="campo-input-wrapper" style="margin-top: 1.2rem;">
+                        <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">PLACA PRINCIPAL</label>
                         <div class="input-con-icono">
                             <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="2" ry="2"></rect><circle cx="7" cy="12" r="1"></circle><circle cx="17" cy="12" r="1"></circle></svg>
-                            <input type="text" id="edit-placa" style="text-transform: uppercase;" required>
+                            <input type="text" id="edit-placa" placeholder="Ej. YZA-1234" style="text-transform: uppercase; width: 100%; box-sizing: border-box;" required>
                         </div>
                     </div>
 
-                    <button type="submit" id="btn-guardar-perfil" class="btn-neon" style="margin-top: 1.5rem; border-radius: 12px; padding: 1rem;">Guardar Cambios</button>
-                    <div id="mensaje-perfil" class="mensaje-terminal oculto" style="margin-top: 1rem;"></div>
+                    <button type="submit" id="btn-guardar-perfil" class="btn-neon" style="margin-top: 1.5rem; border-radius: 12px; padding: 1.1rem; width: 100%;">Guardar Cambios</button>
+                    
+                    <div id="mensaje-perfil" class="mensaje-terminal oculto" style="margin-top: 1rem; font-size: 0.9rem;"></div>
                 </form>
             </section>
 
-            <section class="seccion-perfil">
+            <section class="seccion-perfil" id="seccion-billetera">
                 <h3 class="titulo-seccion">Métodos de Pago</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Próximamente podrás agregar tus tarjetas aquí (Fase 4).</p>
-                </section>
+                <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1.5rem;">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.5; margin-bottom: 10px;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg><br>
+                    Aquí podrás administrar tus tarjetas en la Fase 4.
+                </p>
+            </section>
         </div>
 
     </main>

@@ -18,38 +18,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { mensajeUI.classList.add('oculto'); }, 4000);
     }
 
-    // 1. Cargar datos del usuario
+    // 1. Cargar los datos del usuario actual
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             usuarioActualUID = user.uid;
-            const docRef = doc(firestoreDB, "usuarios", usuarioActualUID);
-            const docSnap = await getDoc(docRef);
+            try {
+                const docRef = doc(firestoreDB, "usuarios", usuarioActualUID);
+                const docSnap = await getDoc(docRef);
 
-            if (docSnap.exists()) {
-                const datos = docSnap.data();
-                inputNombre.value = datos.nombre || "";
-                inputPlaca.value = datos.placa || "";
+                if (docSnap.exists()) {
+                    const datos = docSnap.data();
+                    inputNombre.value = datos.nombre || "";
+                    inputPlaca.value = datos.placa || "";
+                }
+            } catch (error) {
+                console.error("Error al cargar perfil:", error);
             }
         } else {
+            // Si nadie inició sesión, lo botamos
             window.location.href = '../index.html';
         }
     });
 
-    // 2. Guardar cambios
+    // 2. Guardar los cambios con validación
     formPerfil.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const nuevoNombre = inputNombre.value.trim();
         const nuevaPlaca = inputPlaca.value.trim().toUpperCase();
 
-        // 🛡️ VALIDACIÓN DE PLACA
+        // 🛡️ VALIDACIÓN DE PLACA ESTRICTA
         const regexPlaca = /^[A-Z]{3,4}-\d{2,4}$/;
         if (!regexPlaca.test(nuevaPlaca)) {
-            mostrarMensaje("Placa inválida (Ej. ABC-1234)", "error");
+            mostrarMensaje("Placa inválida. Usa formato real (Ej. YZA-1234)", "error");
             return;
         }
 
-        btnGuardar.textContent = "Guardando...";
+        btnGuardar.textContent = "Guardando en nube...";
         btnGuardar.disabled = true;
 
         try {
@@ -59,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 placa: nuevaPlaca
             });
 
-            // Actualizamos la memoria local para que el dashboard y el carrito se enteren
+            // Actualizamos la memoria local para que la App no tenga que recargar
             localStorage.setItem('nombreUsuario', nuevoNombre);
             localStorage.setItem('placaUsuario', nuevaPlaca);
 
