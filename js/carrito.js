@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function generarCodigoReserva() {
         const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let codigo = 'PARK-';
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 5; i++) {
             codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
         }
         return codigo;
