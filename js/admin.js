@@ -276,4 +276,112 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- 7. FASE 5: BUSCADOR INTELIGENTE Y PLAN B (Celular Apagado) ---
+    const inputBusqueda = document.getElementById('input-busqueda-admin');
+    const btnBuscar = document.getElementById('btn-buscar-admin');
+    const divResultado = document.getElementById('resultado-busqueda');
+
+    if (btnBuscar && inputBusqueda) {
+        btnBuscar.addEventListener('click', () => {
+            const query = inputBusqueda.value.trim().toUpperCase();
+            
+            if (!query) {
+                alert("Por favor ingresa una placa o código.");
+                return;
+            }
+
+            btnBuscar.textContent = "Buscando...";
+            divResultado.classList.add('oculto');
+            
+            // Buscamos en nuestra variable local de tickets activos (adminTicketsActivos)
+            let ticketEncontrado = null;
+            let idTicketEncontrado = null;
+
+            for (let id in adminTicketsActivos) {
+                const t = adminTicketsActivos[id];
+                if (id === query || (t.placa && t.placa === query)) {
+                    ticketEncontrado = t;
+                    idTicketEncontrado = id;
+                    break;
+                }
+            }
+
+            setTimeout(() => {
+                btnBuscar.textContent = "Buscar Cliente";
+                divResultado.classList.remove('oculto');
+
+                if (!ticketEncontrado) {
+                    divResultado.innerHTML = `<p style="color: var(--danger-neon); text-align: center; margin: 0; font-weight: bold;">❌ No se encontró ningún vehículo activo con esa placa o código.</p>`;
+                    return;
+                }
+
+                // Si lo encontramos, evaluamos su estado financiero
+                let colorEstado = "#32D74B"; // Verde por defecto
+                let accionHTML = "";
+                let mensajeDeuda = "Todo pagado";
+
+                if (ticketEncontrado.estado === 'multado') {
+                    colorEstado = "#FF00FF"; // Magenta
+                    mensajeDeuda = `DEBE MULTA: $${ticketEncontrado.pagoMulta} MXN`;
+                    accionHTML = `
+                        <button class="btn-resolver-plan-b" data-id="${idTicketEncontrado}" style="background: #FF00FF; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%;">
+                            💵 Cobrar Multa en Efectivo y Abrir Salida
+                        </button>`;
+                } else if (ticketEncontrado.estado === 'en_uso' || ticketEncontrado.estado === 'reservado') {
+                    colorEstado = "#FFD60A"; // Amarillo
+                    mensajeDeuda = "Ticket en curso (Aún no cobra salida)";
+                    accionHTML = `
+                        <button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: transparent; border: 1px solid var(--spot-selected); color: var(--spot-selected); padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%;">
+                            🚨 Forzar Apertura de Salida
+                        </button>`;
+                } else if (ticketEncontrado.estado === 'pagado') {
+                    accionHTML = `
+                        <button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: var(--success-neon); color: black; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%;">
+                            ✅ Ya pagó. Abrir Pluma de Salida
+                        </button>`;
+                }
+
+                divResultado.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <p style="margin: 0; color: var(--text-muted); font-size: 0.8rem;">CLIENTE ENCONTRADO</p>
+                            <strong style="color: white; font-size: 1.1rem;">${ticketEncontrado.nombre}</strong><br>
+                            <span style="color: var(--spot-selected); font-family: monospace;">${idTicketEncontrado}</span> | Placa: <strong>${ticketEncontrado.placa}</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="margin: 0; color: var(--text-muted); font-size: 0.8rem;">ESTADO FINANCIERO</p>
+                            <strong style="color: ${colorEstado};">${mensajeDeuda}</strong><br>
+                            <span style="color: white; font-size: 0.85rem;">Cajón: ${ticketEncontrado.cajon}</span>
+                        </div>
+                    </div>
+                    ${accionHTML}
+                `;
+
+                // Agregamos eventos a los botones generados
+                const btnResolver = divResultado.querySelector('.btn-resolver-plan-b');
+                if (btnResolver) {
+                    btnResolver.addEventListener('click', () => {
+                        if(confirm("¿Confirmas que recibiste el pago en efectivo y deseas abrir la pluma de SALIDA?")) {
+                            set(ref(db, `tickets_activos/${idTicketEncontrado}/estado`), 'pagado');
+                            set(ref(db, 'control_plumas/salida'), 'abrir');
+                            alert("✅ Pago registrado. Abriendo pluma...");
+                            divResultado.innerHTML = `<p style="color: var(--success-neon); text-align: center;">Pluma abierta y pago resuelto.</p>`;
+                        }
+                    });
+                }
+
+                const btnAbrir = divResultado.querySelector('.btn-abrir-plan-b');
+                if (btnAbrir) {
+                    btnAbrir.addEventListener('click', () => {
+                        if(confirm("¿Confirmas abrir la pluma de SALIDA manualmente para este vehículo?")) {
+                            set(ref(db, 'control_plumas/salida'), 'abrir');
+                            alert("✅ Abriendo pluma de salida...");
+                        }
+                    });
+                }
+
+            }, 800); // Pequeño efecto de búsqueda
+        });
+    }
+
 });

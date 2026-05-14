@@ -66,6 +66,25 @@
                     </p>
                 </div>
             </section>
+
+            <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 2rem; border-top: 3px solid var(--spot-selected);">
+                <h3 class="titulo-seccion" style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Buscador de Emergencia (Plan B)
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
+                    Usa esta herramienta si el cliente se quedó sin batería o perdió su código.
+                </p>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234 o PARK-ABCD)" style="flex: 1; min-width: 250px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; text-transform: uppercase;">
+                    <button id="btn-buscar-admin" class="btn-neon" style="padding: 12px 24px; border-radius: 10px;">Buscar Cliente</button>
+                </div>
+
+                <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed var(--border-dark);">
+                    </div>
+            </section>
+
         </div>
         <!-- Tabla del Historial de Firestore -->
         <section style="margin-top: 3rem;">
