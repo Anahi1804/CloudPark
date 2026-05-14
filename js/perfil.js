@@ -99,36 +99,97 @@ document.addEventListener('DOMContentLoaded', () => {
         btnMostrarForm.classList.remove('oculto');
     });
 
-    // --- 3. GUARDAR NUEVA TARJETA ---
+// --- 3. GUARDAR NUEVA TARJETA Y VALIDACIONES ---
+
+    // 🌟 UX: Formateo automático mientras el usuario escribe
+    const inputCardNum = document.getElementById('card-numero');
+    const inputCardExp = document.getElementById('card-exp');
+    const inputCardCvv = document.getElementById('card-cvv');
+
+    if(inputCardNum && inputCardExp && inputCardCvv) {
+        // Separa la tarjeta de 4 en 4 y prohíbe letras
+        inputCardNum.addEventListener('input', function (e) {
+            this.value = this.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+        });
+
+        // Agrega la diagonal automática en la fecha (MM/AA)
+        inputCardExp.addEventListener('input', function (e) {
+            this.value = this.value.replace(/\D/g, ''); // Solo números
+            if (this.value.length > 2) {
+                this.value = this.value.substring(0, 2) + '/' + this.value.substring(2, 4);
+            }
+        });
+
+        // Prohíbe letras en el CVV
+        inputCardCvv.addEventListener('input', function (e) {
+            this.value = this.value.replace(/\D/g, '');
+        });
+    }
+
+    // 🛡️ Lógica de Guardado con Seguridad Bancaria
     formTarjeta.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const num = document.getElementById('card-numero').value.replace(/\s/g, '');
         
-        if(num.length < 16) {
-            alert("El número de tarjeta debe tener 16 dígitos.");
+        const nombreCard = document.getElementById('card-nombre').value.trim();
+        const numOriginal = inputCardNum.value;
+        const numLimpio = numOriginal.replace(/\s/g, ''); // Le quitamos los espacios para la base de datos
+        const exp = inputCardExp.value;
+        const cvv = inputCardCvv.value;
+
+        // 🚨 1. Validar Número de Tarjeta (Exactamente 16 números)
+        const regexNum = /^\d{16}$/;
+        if (!regexNum.test(numLimpio)) {
+            alert("❌ Número inválido: La tarjeta debe tener exactamente 16 números.");
+            return;
+        }
+
+        // 🚨 2. Validar Fecha de Vencimiento (Mes 01-12, Año 2 números)
+        const regexExp = /^(0[1-9]|1[0-2])\/\d{2}$/;
+        if (!regexExp.test(exp)) {
+            alert("❌ Fecha inválida: Usa el formato de mes válido y año (Ej. 12/25).");
+            return;
+        }
+
+        // 🚨 3. Validar CVV (Exactamente 3 o 4 números)
+        const regexCvv = /^\d{3,4}$/;
+        if (!regexCvv.test(cvv)) {
+            alert("❌ CVV inválido: Deben ser 3 o 4 números de seguridad.");
             return;
         }
 
         const nuevaCard = {
-            nombreCard: document.getElementById('card-nombre').value,
-            numero: num,
-            exp: document.getElementById('card-exp').value,
-            cvv: document.getElementById('card-cvv').value,
+            nombreCard: nombreCard,
+            numero: numLimpio,
+            exp: exp,
+            cvv: cvv,
             fechaRegistro: new Date().getTime()
         };
+
+        const btnGuardar = formTarjeta.querySelector('button[type="submit"]');
+        btnGuardar.textContent = "Guardando...";
+        btnGuardar.disabled = true;
 
         try {
             const tarjetasRef = collection(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago");
             await addDoc(tarjetasRef, nuevaCard);
+            
             formTarjeta.reset();
             formTarjeta.classList.add('oculto');
             btnMostrarForm.classList.remove('oculto');
             cargarTarjetas();
+            
+            // Usamos tu función de mensaje verde para que se vea bonito
+            mostrarMensaje("¡Tarjeta agregada de forma segura!", "exito");
         } catch (error) {
             console.error("Error al guardar tarjeta:", error);
+            mostrarMensaje("Hubo un problema al guardar la tarjeta.", "error");
         }
+
+        btnGuardar.textContent = "Guardar Tarjeta";
+        btnGuardar.disabled = false;
     });
 
+    
     // --- 4. GUARDAR / ACTUALIZAR DATOS DE PERFIL ---
     formPerfil.addEventListener('submit', async (e) => {
         e.preventDefault();
