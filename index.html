@@ -70,5 +70,14 @@
     
     <!-- Esta es tu línea actual: -->
     <script type="module" src="js/auth.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA Lista! Service Worker registrado.', reg.scope))
+                    .catch(err => console.error('Error en Service Worker', err));
+            });
+        }
+    </script>
 </body>
 </html>
