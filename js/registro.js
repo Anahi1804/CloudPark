@@ -22,6 +22,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const correo = document.getElementById('reg-correo').value.trim();
         const password = document.getElementById('reg-password').value;
 
+        // --- NUEVO: VALIDACIONES ESTRICTAS ---
+        // 1. Validar correo (Debe tener un arroba y un punto)
+        const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!regexCorreo.test(correo)) {
+            mostrarMensaje("Por favor, ingresa un correo electrónico válido.", "error");
+            return; // Corta la ejecución aquí
+        }
+
+        // 2. Validar placa (Formato mexicano: 3 o 4 Letras, guion, 2 a 4 números)
+        // Ejemplos aceptados: ABC-123, YZA-1234, ABCD-12
+        const regexPlaca = /^[A-Z]{3,4}-\d{2,4}$/;
+        if (!regexPlaca.test(placa)) {
+            mostrarMensaje("La placa debe tener formato real (Ej. ABC-1234 o YZA-123)", "error");
+            return; // Corta la ejecución aquí
+        }
+
         btnSubmit.textContent = "Creando cuenta...";
         btnSubmit.disabled = true;
         mensajeRegistro.classList.add('oculto');
