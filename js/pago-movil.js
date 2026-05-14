@@ -1,5 +1,5 @@
 // js/pago-movil.js
-import { db, ref, onValue, update } from './firebase-config.js';
+import { db, ref, onValue, update, auth, firestoreDB, onAuthStateChanged, collection, getDocs } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const ticketGuardado = localStorage.getItem('ticketActual');
@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const montoUI = document.getElementById('monto-total');
     const formPago = document.getElementById('form-pago-simulado');
     const btnProcesar = document.getElementById('btn-procesar-pago');
+    
+    // Variables Billetera
+    const selectorTarjetas = document.getElementById('selector-tarjetas');
+    const alertaSinTarjetas = document.getElementById('alerta-sin-tarjetas');
+    let usuarioActualUID = null;
 
     let totalAPagar = 0;
     let historicoPagado = 0;
@@ -23,14 +28,57 @@ document.addEventListener('DOMContentLoaded', () => {
     let hardwareListenerActivo = false;
     let esPagoMulta = false;
 
-    // NUESTRAS 3 CAJITAS GLOBALES:
+    // Cajitas financieras
     let historicoReserva = 0;
     let historicoEstacionamiento = 0;
     let historicoMulta = 0;
 
     const ticketRef = ref(db, 'tickets_activos/' + codigoTicket);
     
-    // AQUÍ EMPIEZA LA LECTURA DONDE VIVE "ticketFisico"
+    // 1. CARGAMOS LA BILLETERA
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            usuarioActualUID = user.uid;
+            await cargarTarjetasBilletera();
+        } else {
+            window.location.href = '../index.html';
+        }
+    });
+
+    async function cargarTarjetasBilletera() {
+        selectorTarjetas.innerHTML = '<option value="">Selecciona una tarjeta...</option>';
+        try {
+            const tarjetasRef = collection(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago");
+            const snapshot = await getDocs(tarjetasRef);
+
+            if (snapshot.empty) {
+                selectorTarjetas.classList.add('oculto');
+                alertaSinTarjetas.classList.remove('oculto');
+                btnProcesar.disabled = true;
+                btnProcesar.style.opacity = '0.5';
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                const t = doc.data();
+                const ultimosCuatro = t.numero.slice(-4);
+                const opcion = document.createElement('option');
+                
+                opcion.value = t.numero; 
+                opcion.textContent = `💳 ${t.nombreCard} (**** ${ultimosCuatro})`;
+                selectorTarjetas.appendChild(opcion);
+            });
+            
+            // Habilitar botón de pago si no está multado (la lógica de multa lo habilita después)
+            if(!esPagoMulta && totalAPagar > 0) btnProcesar.disabled = false;
+            
+        } catch (error) {
+            console.error("Error al cargar tarjetas:", error);
+            selectorTarjetas.innerHTML = '<option value="">Error al cargar billetera</option>';
+        }
+    }
+
+    // 2. LECTURA DEL TICKET Y RELOJ (Intacto)
     onValue(ticketRef, (snapshot) => {
         const ticketFisico = snapshot.val();
 
@@ -41,14 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // NUEVO: Leemos las 3 cajitas financieras
         historicoReserva = Number(ticketFisico.pagoReserva) || 0;
         historicoEstacionamiento = Number(ticketFisico.pagoEstacionamiento) || 0;
         historicoMulta = Number(ticketFisico.pagoMulta) || 0;
-
         historicoPagado = Number(ticketFisico.totalLiquidado) || 0;
 
-        // Caso A: El usuario ya pagó el apartado, pero AÚN NO ENTRA por la pluma
+        // Caso A: Reservado sin entrar
         if (ticketFisico.estado === "reservado") {
             relojUI.textContent = "En camino";
             relojUI.style.fontSize = "2.5rem";
@@ -57,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso B: El usuario ya pagó su salida
+        // Caso B: Pagado
         if (ticketFisico.estado === "pagado") {
             clearInterval(intervaloReloj);
             relojUI.textContent = "PAGADO";
@@ -74,31 +120,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso D (LA MULTA): El usuario se tardó en salir y fue multado
-
+        // Caso D: Multado
         if (ticketFisico.estado === "multado") {
             esPagoMulta = true;
             clearInterval(intervaloReloj);
             relojUI.style.fontSize = "3rem";
             relojUI.style.color = "var(--danger-neon)";
-            btnProcesar.disabled = false;
+            if (selectorTarjetas.options.length > 1) btnProcesar.disabled = false;
             
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
-                
-                // Límite de prueba 30 seg (30000 ms). En producción pon 15 min (900000 ms)
                 const tiempoTolerancia = 30000; 
                 const inicioMulta = ticketFisico.timestampPagado + tiempoTolerancia;
                 
-                // Calculamos cuánto tiempo lleva ATRASADO
                 const milisegundosRetraso = ahora - inicioMulta;
-                const minutosRetraso = Math.floor(milisegundosRetraso / 1000); // Usamos div /1000 para simular minutos rápidos
+                const minutosRetraso = Math.floor(milisegundosRetraso / 1000); 
                 
                 const horasUI = Math.floor(minutosRetraso / 60).toString().padStart(2, '0');
                 const minUI = (minutosRetraso % 60).toString().padStart(2, '0');
                 relojUI.textContent = `+ ${horasUI}:${minUI} extra`;
 
-                // Cobramos $25 por cada hora (o fracción) de retraso
                 let horasMulta = Math.max(1, Math.ceil(minutosRetraso / 60));
                 totalAPagar = horasMulta * 25.00;
 
@@ -106,14 +147,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnProcesar.textContent = `Pagar Recargo ($${totalAPagar.toFixed(2)})`;
                 btnProcesar.style.background = "linear-gradient(135deg, #FF453A 0%, #8A0000 100%)";
             }, 1000);
-            
-            return; // Detenemos aquí para que no corra el otro reloj
+            return; 
         }
 
-        // Caso C: Ya cruzó la pluma, pero ¿ya se estacionó?
+        // Caso C: En Uso
         if (ticketFisico.estado === "en_uso") {
             esPagoMulta = false;
-            // Sub-caso C1: Aún no se ha estacionado
+            
             if (!ticketFisico.timestampIngresoFisico) {
                 relojUI.textContent = "Manejando";
                 relojUI.style.fontSize = "2rem";
@@ -132,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     onValue(sensorRef, (sensorSnap) => {
                         const estadoCajon = sensorSnap.val();
                         if (estadoCajon === "ocupado" && !ticketFisico.timestampIngresoFisico) {
-                            console.log("¡Auto detectado en el cajón! Iniciando reloj...");
                             update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
                         }
                     });
@@ -140,23 +179,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
-// Sub-caso C2: ¡Ya se estacionó! Arrancamos el cronómetro y el cobro
             clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
             montoUI.style.color = "var(--danger-neon)";
-            btnProcesar.disabled = false;
+            if (selectorTarjetas.options.length > 1) btnProcesar.disabled = false;
             
-            // Regresamos el botón a su color original por si venía de una multa
             btnProcesar.textContent = "Pagar y Liberar Salida";
             btnProcesar.style.background = "linear-gradient(135deg, #0A84FF 0%, #005BB5 100%)";
 
             intervaloReloj = setInterval(() => {
                 const ahora = new Date().getTime();
-                
-                // FIX DEL "-1": Usamos Math.max(0, ...) para evitar números negativos si hay desincronización
                 const milisegundosAdentro = Math.max(0, ahora - ticketFisico.timestampIngresoFisico);
-                
                 const minutosReales = Math.floor(milisegundosAdentro / 1000);
                 
                 const horasUI = Math.floor(minutosReales / 60).toString().padStart(2, '0');
@@ -167,25 +200,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalAPagar = horasACobrar * 25.00;
                 
                 montoUI.innerHTML = `$${totalAPagar.toFixed(2)} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 400;">MXN</span><br><span style="font-size: 0.8rem; color: var(--text-muted);">(${horasACobrar} hr cobrada)</span>`;
-                
             }, 1000);
         }
     });
 
-    // Procesar el pago (Código Limpio sin variables duplicadas)
+    // 3. PROCESAR PAGO CON SIMULADOR BANCARIO
     formPago.addEventListener('submit', (e) => {
         e.preventDefault();
+        
+        const numTarjetaSeleccionada = selectorTarjetas.value;
+
+        if (!numTarjetaSeleccionada) {
+            alert("⚠️ Por favor selecciona una tarjeta para proceder con el pago.");
+            return;
+        }
+
         btnProcesar.disabled = true;
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
+            // SIMULADOR: Fondos Insuficientes
+            if (numTarjetaSeleccionada.endsWith('0000')) {
+                alert("🏦 BANCO RECHAZA: Fondos insuficientes en la tarjeta terminación 0000.");
+                btnProcesar.disabled = false;
+                btnProcesar.textContent = esPagoMulta ? `Pagar Recargo ($${totalAPagar.toFixed(2)})` : "Pagar y Liberar Salida";
+                return; 
+            }
+
+            // SIMULADOR: Tarjeta Bloqueada
+            if (numTarjetaSeleccionada.endsWith('1111')) {
+                alert("🏦 BANCO DECLINA: Tarjeta terminación 1111 bloqueada por seguridad.");
+                btnProcesar.disabled = false;
+                btnProcesar.textContent = esPagoMulta ? `Pagar Recargo ($${totalAPagar.toFixed(2)})` : "Pagar y Liberar Salida";
+                return; 
+            }
+
+            // PAGO EXITOSO
+            btnProcesar.textContent = "Aprobado. Liberando salida...";
+
             let nuevoEstacionamiento = historicoEstacionamiento;
             let nuevoMulta = historicoMulta;
             
             if (esPagoMulta) {
-                nuevoMulta += totalAPagar; // Lo mete a la caja de multas     
+                nuevoMulta += totalAPagar; 
             } else {
-                nuevoEstacionamiento += totalAPagar; // Lo mete a la caja de tiempo normal
+                nuevoEstacionamiento += totalAPagar; 
             }
 
             const totalHistorico = historicoReserva + nuevoEstacionamiento + nuevoMulta;
@@ -196,7 +255,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 pagoMulta: nuevoMulta,
                 granTotal: totalHistorico,
                 timestampPagado: new Date().getTime() 
-            }).then(() => console.log("Pago registrado con desglose perfecto."));
-        }, 2000);
+            }).then(() => console.log("Pago registrado con éxito desde Billetera Digital."));
+            
+        }, 1500);
     });
-}); // Cierre del DOMContentLoaded
+});
