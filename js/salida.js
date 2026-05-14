@@ -2,9 +2,6 @@
 import { db, ref, get, set, firestoreDB, doc, setDoc, update} from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Validar Sesión de quien opera la terminal
-    const usuarioLogueado = localStorage.getItem('usuarioLogueado');
-    if (!usuarioLogueado) { window.location.href = '../index.html'; return; }
 
     const inputCodigo = document.getElementById('codigo-salida');
     const btnValidar = document.getElementById('btn-validar-salida');
