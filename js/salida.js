@@ -69,9 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             // 2. Guardamos en Firestore
+// 3. Borramos de la Realtime Database para liberar el cajón (Recolección de Basura)
             setDoc(historialRef, datosHistorial).then(() => {              
-                // 3. Borramos de la Realtime Database para liberar el cajón (Recolección de Basura)
                 return set(ticketRef, null);
+            }).then(() => {
+                // 🔓 NUEVO: Quitamos el candado de concurrencia
+                return set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
             }).then(() => {
 
                 // 🦾 ¡LA MAGIA: Mandamos la orden al motor de SALIDA!

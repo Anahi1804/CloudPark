@@ -1,6 +1,6 @@
 // js/carrito.js
 // 1. Importamos las herramientas para escribir en Firebase
-import { db, ref, set } from './firebase-config.js';
+import { db, ref, set, runTransaction } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
@@ -55,50 +55,69 @@ document.addEventListener('DOMContentLoaded', () => {
         btnFinalizar.textContent = "Procesando pago con el banco...";
 
         // Simulamos un retraso de procesamiento de banco de 2 segundos
+// Simulamos un retraso de procesamiento de banco de 2 segundos
         setTimeout(() => {
             const codigoGenerado = generarCodigoReserva(); 
 
-            const ahora = new Date();
-            const fechaExpiracion = new Date(ahora);
-            fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete);
+            // 🛡️ INICIAMOS LA TRANSACCIÓN (El Cadenero)
+            const candadoRef = ref(db, `cajones_bloqueados/${cajonSeleccionado}`);
 
-            const datosReserva = {
-                usuario: usuarioLogueado,
-                nombre: localStorage.getItem('nombreUsuario') || "Usuario",
-                placa: localStorage.getItem('placaUsuario') || "S/N",
-                cajon: cajonSeleccionado,
-                paquete: nombrePaquete,
-                minutosComprados: minutosPaquete,
+            runTransaction(candadoRef, (estadoActual) => {
+                if (estadoActual === null) {
+                    // ¡El cajón está libre! Le ponemos nuestro código como candado
+                    return codigoGenerado;
+                } else {
+                    // ¡Alguien más llegó primero en este milisegundo! Abortar.
+                    return; 
+                }
+            }).then((resultadoTransaccion) => {
+                
+                // Si NO logramos poner el candado...
+                if (!resultadoTransaccion.committed) {
+                    alert("¡Lo sentimos! 🤯 Alguien más acaba de reservar este cajón hace un instante. Por favor, selecciona otro.");
+                    window.location.href = 'reservas.html';
+                    return; // Detenemos todo
+                }
 
-                // NUEVO DESGLOSE FINANCIERO:
-                pagoReserva: precioSeleccionado, 
-                pagoEstacionamiento: 0,
-                pagoMulta: 0,
-                granTotal: precioSeleccionado,
+                // ¡SI LLEGAMOS AQUÍ, SOMOS LOS DUEÑOS ABSOLUTOS DEL CAJÓN! 🏆
+                const ahora = new Date();
+                const fechaExpiracion = new Date(ahora);
+                fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete); // Para probar
 
-                totalLiquidado: precioSeleccionado, // Usamos totalLiquidado para unificar la economía
-                totalPagado: precioSeleccionado, // (Dejamos este por compatibilidad del diseño del ticket)
-                codigo: codigoGenerado,
-                timestampCompra: ahora.getTime(), 
-                timestampExpiracion: fechaExpiracion.getTime(),
-                fechaTexto: ahora.toLocaleString(),
-                estado: "reservado" 
-            };
+                const datosReserva = {
+                    usuario: usuarioLogueado,
+                    nombre: localStorage.getItem('nombreUsuario') || "Usuario",
+                    placa: localStorage.getItem('placaUsuario') || "S/N",
+                    cajon: cajonSeleccionado,
+                    paquete: nombrePaquete,
+                    minutosComprados: minutosPaquete,
+                    pagoReserva: precioSeleccionado, 
+                    pagoEstacionamiento: 0,
+                    pagoMulta: 0,
+                    granTotal: precioSeleccionado,
+                    totalLiquidado: precioSeleccionado, 
+                    totalPagado: precioSeleccionado, 
+                    codigo: codigoGenerado,
+                    timestampCompra: ahora.getTime(), 
+                    timestampExpiracion: fechaExpiracion.getTime(),
+                    fechaTexto: ahora.toLocaleString(),
+                    estado: "reservado" 
+                };
 
-            const ticketRef = ref(db, 'tickets_activos/' + codigoGenerado);
+                const ticketRef = ref(db, 'tickets_activos/' + codigoGenerado);
 
-            set(ticketRef, datosReserva)
-                .then(() => {
+                set(ticketRef, datosReserva).then(() => {
                     localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
                     localStorage.removeItem('cajonTemporal');
                     window.location.href = 'ticket.html';
-                })
-                .catch((error) => {
-                    console.error("Error al guardar en Firebase:", error);
-                    alert("Hubo un error de conexión. Intenta de nuevo.");
+                }).catch((error) => {
+                    console.error("Error al guardar:", error);
+                    alert("Hubo un error de conexión.");
                     btnFinalizar.disabled = false;
                     btnFinalizar.textContent = "Pagar y Generar Código";
                 });
-        }, 2000); // 2 segundos de "Loading" falso
+            }); // Fin de la transacción
+
+        }, 2000); 
     });
 });

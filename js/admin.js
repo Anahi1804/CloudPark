@@ -1,5 +1,5 @@
 // js/admin.js
-import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue } from './firebase-config.js';
+import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue,set } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Validar que nadie entre sin iniciar sesión
@@ -86,81 +86,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarHistorial();
 
-    // --- 3. REALTIME DB: Monitor de Cajones en Vivo ---
-    const ticketsRef = ref(db, 'tickets_activos');
-    let cajonesOcupados = {}; // Variable global para guardar info
-    
-    onValue(ticketsRef, (snapshot) => {
-        const ticketsActivos = snapshot.val() || {};
-        cajonesOcupados = {}; // Limpiamos
-        
+// --- 3 y 4. MATRIZ DE ESTADOS EN TIEMPO REAL (Unificada) ---
+    let adminEstadoFisico = {};
+    let adminTicketsActivos = {};
+
+    const ticketsActivosRef = ref(db, 'tickets_activos');
+    const sensoresFisicosRef = ref(db, 'estacionamiento_actual');
+
+    // Escuchamos ambos canales
+    onValue(ticketsActivosRef, (snapshot) => {
+        adminTicketsActivos = snapshot.val() || {};
+        dibujarMapaAdmin();
+    });
+
+    onValue(sensoresFisicosRef, (snapshot) => {
+        adminEstadoFisico = snapshot.val() || {};
+        dibujarMapaAdmin();
+    });
+
+    function dibujarMapaAdmin() {
+        const equivalencias = {
+            'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3',
+            'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6'
+        };
+
+        // Indexamos los tickets por cajón para búsqueda rápida
+        let infoPorCajon = {};
+        for (let id in adminTicketsActivos) {
+            infoPorCajon[adminTicketsActivos[id].cajon] = { id: id, ...adminTicketsActivos[id] };
+        }
+
         let htmlMapa = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">`;
         const todosLosCajones = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'];
-        
-        for (let id in ticketsActivos) cajonesOcupados[ticketsActivos[id].cajon] = { id: id, ...ticketsActivos[id] };
 
         todosLosCajones.forEach(cajon => {
-            const info = cajonesOcupados[cajon];
-            if (info) {
-                let colorBorder = '#FFA500'; 
-                if (info.estado === 'en_uso') colorBorder = 'var(--spot-selected)';
-                if (info.estado === 'pagado') colorBorder = 'var(--success-neon)';
-                if (info.estado === 'multado') colorBorder = '#FF00FF'; 
-                
-                // ¡CORRECCIÓN! Agregamos id="cajon-A1" para que los sensores lo encuentren
-                htmlMapa += `
-                    <div id="cajon-${cajon}" class="cajon-admin" data-cajon="${cajon}" style="background: rgba(255,255,255,0.05); border: 2px solid ${colorBorder}; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <strong style="color: #fff; font-size: 1.2rem;">${cajon}</strong><br>
-                        <span style="font-size: 0.7rem; color: ${colorBorder}; text-transform: uppercase; font-weight: bold;">${info.estado}</span>
-                    </div>
-                `;
+            const idSensor = equivalencias[cajon];
+            const estadoSensor = adminEstadoFisico[idSensor]; 
+            const ticketInfo = infoPorCajon[cajon];
+
+            let colorFondo = 'rgba(255,255,255,0.02)';
+            let colorBorde = 'var(--border-dark)';
+            let colorTexto = 'var(--text-muted)';
+            let etiqueta = 'LIBRE';
+            let brillo = 'none';
+
+            // 🚨 LÓGICA CLASIFICADORA DEL ADMIN
+            if (estadoSensor === 'ocupado') {
+                if (!ticketInfo || ticketInfo.estado === 'reservado') {
+                    // 🟠 OBSTRUIDO: Hay auto físico, pero el sistema no reconoce un ticket válido cruzando la caseta
+                    colorFondo = 'rgba(255, 149, 0, 0.15)'; 
+                    colorBorde = '#FF9500';
+                    colorTexto = '#FF9500';
+                    etiqueta = 'OBSTRUIDO';
+                    brillo = 'inset 0 0 15px rgba(255, 149, 0, 0.5)';
+                } else {
+                    // 🔴 OCUPADO NORMAL
+                    colorFondo = 'rgba(255, 69, 58, 0.15)'; 
+                    colorBorde = 'var(--danger-neon)';
+                    colorTexto = 'var(--danger-neon)';
+                    etiqueta = ticketInfo.estado === 'multado' ? 'MULTADO' : 'OCUPADO';
+                    if(ticketInfo.estado === 'multado') colorBorde = '#FF00FF'; // Magenta multado
+                }
             } else {
-                htmlMapa += `
-                    <div id="cajon-${cajon}" style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border-dark); border-radius: 8px; padding: 1rem; text-align: center; opacity: 0.5; transition: all 0.3s;">
-                        <strong style="color: var(--text-muted); font-size: 1.2rem;">${cajon}</strong><br>
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">LIBRE</span>
-                    </div>
-                `;
+                if (ticketInfo) {
+                    if (ticketInfo.estado === 'en_uso') {
+                        // 🟣 EN CAMINO 
+                        colorFondo = 'rgba(191, 90, 242, 0.1)';
+                        colorBorde = '#BF5AF2'; 
+                        colorTexto = '#BF5AF2';
+                        etiqueta = 'EN TRÁNSITO';
+                        brillo = 'inset 0 0 10px rgba(191, 90, 242, 0.3)';
+                    } else if (ticketInfo.estado === 'reservado') {
+                        // 🟡 RESERVADO 
+                        colorFondo = 'rgba(255, 214, 10, 0.1)';
+                        colorBorde = '#FFD60A'; 
+                        colorTexto = '#FFD60A';
+                        etiqueta = 'RESERVADO';
+                    } else if (ticketInfo.estado === 'pagado') {
+                        // 🟢 SALIENDO
+                        colorFondo = 'rgba(50, 215, 75, 0.1)';
+                        colorBorde = 'var(--success-neon)';
+                        colorTexto = 'var(--success-neon)';
+                        etiqueta = 'SALIENDO';
+                    }
+                }
             }
+
+            htmlMapa += `
+                <div class="cajon-admin" data-cajon="${cajon}" style="background: ${colorFondo}; border: 2px solid ${colorBorde}; box-shadow: ${brillo}; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s;">
+                    <strong style="color: #fff; font-size: 1.2rem;">${cajon}</strong><br>
+                    <span style="font-size: 0.7rem; color: ${colorTexto}; text-transform: uppercase; font-weight: bold;">${etiqueta}</span>
+                </div>
+            `;
         });
+
         htmlMapa += `</div>`;
         mapaContainer.innerHTML = htmlMapa;
 
-        // Configurar clics de "Espiar"
+        // Clics para Inspección
         document.querySelectorAll('.cajon-admin').forEach(btn => {
             btn.addEventListener('click', () => {
                 const cajonSeleccionado = btn.getAttribute('data-cajon');
-                const datos = cajonesOcupados[cajonSeleccionado];
-                if (datos) mostrarInfo(datos);
+                const datos = infoPorCajon[cajonSeleccionado];
+                if (datos) {
+                    mostrarInfo(datos);
+                } else {
+                    const idSensor = equivalencias[cajonSeleccionado];
+                    if (adminEstadoFisico[idSensor] === 'ocupado') {
+                        infoVehiculo.innerHTML = `<div style="text-align:center; padding:1.5rem; color:#FF9500;"><h3>⚠️ Vehículo Obstructor</h3><p>Hay un auto físicamente en el cajón, pero no existe un ticket activo. Revise las cámaras y aplique el protocolo de seguridad.</p></div>`;
+                    } else {
+                        infoVehiculo.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted);"><p>Cajón vacío y sin reservas.</p></div>`;
+                    }
+                }
             });
         });
-    });
-
-    // --- 4. MAPA EN TIEMPO REAL (Sensores Físicos encendiendo los fondos) ---
-    const sensoresRef = ref(db, 'estacionamiento_actual');
-    const equivalenciasSensores = {
-        'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3', 'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3'
-    };
-    
-    onValue(sensoresRef, (snapshot) => {
-        const sensores = snapshot.val();
-        if (!sensores) return;
-
-        for (const [idSensor, estado] of Object.entries(sensores)) {
-            const nombreCajon = equivalenciasSensores[idSensor];
-            const cajonUI = document.getElementById(`cajon-${nombreCajon}`);
-            
-            if (cajonUI) {
-                if (estado === "ocupado") {
-                    cajonUI.style.backgroundColor = "rgba(255, 69, 58, 0.2)"; // Fondo rojo suave
-                    cajonUI.style.boxShadow = "inset 0 0 15px rgba(255, 69, 58, 0.5)"; // Resplandor interno rojo
-                } else {
-                    cajonUI.style.backgroundColor = "rgba(255, 255, 255, 0.05)"; // Regresa a la normalidad
-                    cajonUI.style.boxShadow = "none";
-                }
-            }
-        }
-    });
+    }
 
     // --- 5. PUENTE RMI: Conexión con Pyro4 mediante Python Local ---
     const btnRMI = document.getElementById('btn-auditoria-rmi');
@@ -208,4 +248,25 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
     }
+
+    // --- 6. BOTONES DE EMERGENCIA (HARDWARE) ---
+    const btnEmergenciaEntrada = document.getElementById('btn-emergencia-entrada');
+    const btnEmergenciaSalida = document.getElementById('btn-emergencia-salida');
+
+    if(btnEmergenciaEntrada) {
+        btnEmergenciaEntrada.addEventListener('click', () => {
+            if(confirm("🚨 ¿Estás seguro de forzar la apertura de la pluma de ENTRADA?")) {
+                set(ref(db, 'control_plumas/entrada'), 'abrir');
+            }
+        });
+    }
+
+    if(btnEmergenciaSalida) {
+        btnEmergenciaSalida.addEventListener('click', () => {
+            if(confirm("🚨 ¿Estás seguro de forzar la apertura de la pluma de SALIDA?")) {
+                set(ref(db, 'control_plumas/salida'), 'abrir');
+            }
+        });
+    }
+
 });

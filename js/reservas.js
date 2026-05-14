@@ -19,31 +19,29 @@ document.addEventListener('DOMContentLoaded', () => {
     let cajonSeleccionado = null;
 
     // --- VARIABLES DE LA MÁQUINA DE ESTADOS ---
-    let estadoFisico = {}; // Lo que dice el hardware
-    let cajonesReservados = []; // Lo que dicen los tickets
+    let estadoFisico = {}; 
+    let infoTickets = {}; // Guardará el estado exacto de cada cajón
 
     // 1. ESCUCHAR HARDWARE (ESP32)
     const estacionamientoRef = ref(db, 'estacionamiento_actual');
     onValue(estacionamientoRef, (snapshot) => {
         estadoFisico = snapshot.val() || {};
-        procesarMapa(); // Recalcular mapa
+        procesarMapa(); 
     });
 
     // 2. ESCUCHAR COMPRAS (NUBE)
     const ticketsRef = ref(db, 'tickets_activos');
     onValue(ticketsRef, (snapshot) => {
         const tickets = snapshot.val() || {};
-        // Filtramos solo los cajones que tienen un ticket en estado "reservado"
-        cajonesReservados = Object.values(tickets)
-            .filter(ticket => ticket.estado === "reservado")
-            .map(ticket => ticket.cajon);
-            
-        procesarMapa(); // Recalcular mapa
+        infoTickets = {}; // Limpiamos la memoria
+        for (let id in tickets) {
+            infoTickets[tickets[id].cajon] = tickets[id].estado;
+        }
+        procesarMapa(); 
     });
 
-    // 3. LA LÓGICA DE NEGOCIO (Cruzando datos)
+    // 3. LA LÓGICA DE MATRIZ DE ESTADOS
     function procesarMapa() {
-        // Mapeamos los nombres del ESP32 con la web
         const equivalencias = {
             'A1': estadoFisico.cajon_1, 'A2': estadoFisico.cajon_2, 'A3': estadoFisico.cajon_3,
             'B1': estadoFisico.cajon_4, 'B2': estadoFisico.cajon_5, 'B3': estadoFisico.cajon_6
@@ -51,27 +49,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cajonesElementos.forEach(cajon => {
             const numero = cajon.querySelector('.numero-cajon').textContent;
-            const estadoSensor = equivalencias[numero]; // "libre" u "ocupado"
-            const tieneReservaActiva = cajonesReservados.includes(numero);
+            const estadoSensor = equivalencias[numero]; // "libre" o "ocupado"
+            const estadoTicket = infoTickets[numero]; // "reservado", "en_uso", "pagado"...
 
-            // Limpiamos colores
-            cajon.classList.remove('disponible', 'ocupado', 'reservado', 'seleccionado');
+            cajon.classList.remove('disponible', 'ocupado', 'reservado', 'en-camino', 'seleccionado');
 
-            // MÁQUINA DE ESTADOS:
+            // 🚀 TU NUEVA MATRIZ DE COLORES:
             if (estadoSensor === 'ocupado') {
-                // ESTADO 3: Físicamente ocupado (Rojo) - ¡Vence a cualquier reserva!
-                cajon.classList.add('ocupado');
+                cajon.classList.add('ocupado'); // Rojo para el usuario (siempre)
                 if (cajonSeleccionado === numero) resetearSeleccion();
-
-            } else if (tieneReservaActiva) {
-                // ESTADO 2: Vacío físicamente, pero alguien ya lo pagó (Naranja)
-                cajon.classList.add('reservado');
+            } else if (estadoTicket === 'en_uso') {
+                cajon.classList.add('en-camino'); // Morado (Pasó caseta pero no llega)
                 if (cajonSeleccionado === numero) resetearSeleccion();
-
+            } else if (estadoTicket === 'reservado') {
+                cajon.classList.add('reservado'); // Amarillo (Comprado sin llegar)
+                if (cajonSeleccionado === numero) resetearSeleccion();
             } else {
-                // ESTADO 1: Libre de todo (Verde)
-                cajon.classList.add('disponible');
-                // Si estaba seleccionado por el usuario actual, se lo respetamos
+                cajon.classList.add('disponible'); // Verde (Libre digital y físicamente)
                 if (cajonSeleccionado === numero) cajon.classList.add('seleccionado');
             }
         });

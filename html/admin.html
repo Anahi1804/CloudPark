@@ -15,10 +15,19 @@
                 <h1 style="margin: 0;">Panel de Control</h1>
                 <p style="color: var(--text-muted); margin-top: 5px;">Modo Administrador</p>
             </div>
-            <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 0.5rem 1rem;">Volver a App</a>
-            <button id="btn-auditoria-rmi" style="background: linear-gradient(135deg, #8A2BE2, #4B0082); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 15px;">
-                Ejecutar Auditoría
-            </button>
+            
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                <button id="btn-emergencia-entrada" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">
+                    Abrir Entrada
+                </button>
+                <button id="btn-emergencia-salida" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">
+                    Abrir Salida
+                </button>
+                <button id="btn-auditoria-rmi" style="background: linear-gradient(135deg, #8A2BE2, #4B0082); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    Auditoría
+                </button>
+                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir</a>
+            </div>
         </header>
 
         <!-- Métricas Rápidas -->
