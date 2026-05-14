@@ -9,29 +9,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const txtCajon = document.getElementById('resumen-cajon');
     const txtPaquete = document.getElementById('resumen-paquete');
-    const txtTotal = document.getElementById('resumen-total');
-    const btnFinalizar = document.getElementById('btn-finalizar-compra');
+    const txtTotal = document.getElementById('monto-total');
+    const selectPaquete = document.getElementById('select-paquete');
+    
+    const btnFinalizar = document.getElementById('btn-finalizar-compra'); // <-- ID Corregido
     const selectorTarjetas = document.getElementById('selector-tarjetas');
     const alertaSinTarjetas = document.getElementById('alerta-sin-tarjetas');
 
     let usuarioLogueado = null;
     let usuarioActualUID = null;
+    let precioFinal = precioSeleccionado;
+    let paqueteFinal = nombrePaquete;
+    let minutosFinales = minutosPaquete;
 
-    if (!cajonSeleccionado || !nombrePaquete) {
+    if (!cajonSeleccionado) {
         alert("Faltan datos de la reserva. Regresando...");
         window.location.href = 'reservas.html';
         return;
     }
 
     txtCajon.textContent = cajonSeleccionado;
-    txtPaquete.textContent = nombrePaquete;
-    txtTotal.textContent = `$${precioSeleccionado.toFixed(2)} MXN`;
+
+    // Detectar cuando el usuario elige un paquete
+    selectPaquete.addEventListener('change', () => {
+        const opcion = selectPaquete.options[selectPaquete.selectedIndex];
+        minutosFinales = parseInt(opcion.value);
+        precioFinal = parseFloat(opcion.getAttribute('data-precio'));
+        paqueteFinal = opcion.text.split('-')[0].trim(); 
+        
+        txtTotal.textContent = `$${precioFinal.toFixed(2)} MXN`;
+        
+        // Habilitamos el botón SOLO si seleccionó paquete Y tiene tarjetas (lo revisamos más abajo)
+        if (selectorTarjetas.options.length > 1) { 
+            btnFinalizar.disabled = false;
+        }
+    });
 
     // 1. Verificamos sesión y cargamos tarjetas
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             usuarioLogueado = user.email;
             usuarioActualUID = user.uid;
+            document.getElementById('resumen-usuario').textContent = usuarioLogueado;
             await cargarTarjetasBilletera();
         } else {
             window.location.href = '../index.html';
@@ -48,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (snapshot.empty) {
                 selectorTarjetas.classList.add('oculto');
                 alertaSinTarjetas.classList.remove('oculto');
-                btnFinalizar.disabled = true; // No puede pagar si no tiene tarjeta
+                btnFinalizar.disabled = true; 
                 btnFinalizar.style.opacity = '0.5';
                 return;
             }
@@ -58,8 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ultimosCuatro = t.numero.slice(-4);
                 const opcion = document.createElement('option');
                 
-                // Guardamos el número completo en el 'value' para analizarlo luego
-                opcion.value = t.numero; 
+                opcion.value = t.numero; // Guardamos el num completo oculto
                 opcion.textContent = `💳 ${t.nombreCard} (**** ${ultimosCuatro})`;
                 selectorTarjetas.appendChild(opcion);
             });
@@ -97,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("🏦 BANCO RECHAZA: Fondos insuficientes en la tarjeta terminación 0000.");
                 btnFinalizar.disabled = false;
                 btnFinalizar.textContent = "Pagar y Generar Código";
-                return; // Cortamos el flujo aquí
+                return; 
             }
 
             // Caso 2: Tarjeta Bloqueada
@@ -105,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("🏦 BANCO DECLINA: Tarjeta terminación 1111 bloqueada por seguridad. Contacte a su banco.");
                 btnFinalizar.disabled = false;
                 btnFinalizar.textContent = "Pagar y Generar Código";
-                return; // Cortamos el flujo aquí
+                return; 
             }
 
             // Caso 3: PAGO EXITOSO -> Continuamos con el candado de Firebase
@@ -114,16 +132,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const codigoGenerado = generarCodigoReserva(); 
             const candadoRef = ref(db, `cajones_bloqueados/${cajonSeleccionado}`);
 
-            // 🛡️ TRANSACCIÓN DE CONCURRENCIA (El Cadenero)
+            // 🛡️ TRANSACCIÓN DE CONCURRENCIA
             runTransaction(candadoRef, (estadoActual) => {
                 if (estadoActual === null) {
-                    return codigoGenerado; // Está libre, lo tomamos
+                    return codigoGenerado; 
                 } else {
-                    return; // Alguien nos ganó
+                    return; 
                 }
             }).then((resultadoTransaccion) => {
                 if (!resultadoTransaccion.committed) {
-                    alert("¡Lo sentimos! 🤯 Alguien más acaba de comprar este cajón mientras procesábamos tu pago. Tu tarjeta NO ha sido cobrada.");
+                    alert("¡Lo sentimos! 🤯 Alguien más acaba de comprar este cajón. Tu tarjeta NO ha sido cobrada.");
                     window.location.href = 'reservas.html';
                     return;
                 }
@@ -131,21 +149,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 // SOMOS DUEÑOS DEL CAJÓN
                 const ahora = new Date();
                 const fechaExpiracion = new Date(ahora);
-                fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete);
+                fechaExpiracion.setSeconds(ahora.getSeconds() + minutosFinales);
 
                 const datosReserva = {
                     usuario: usuarioLogueado,
                     nombre: localStorage.getItem('nombreUsuario') || "Usuario",
                     placa: localStorage.getItem('placaUsuario') || "S/N",
                     cajon: cajonSeleccionado,
-                    paquete: nombrePaquete,
-                    minutosComprados: minutosPaquete,
-                    pagoReserva: precioSeleccionado, 
+                    paquete: paqueteFinal,
+                    minutosComprados: minutosFinales,
+                    pagoReserva: precioFinal, 
                     pagoEstacionamiento: 0,
                     pagoMulta: 0,
-                    granTotal: precioSeleccionado,
-                    totalLiquidado: precioSeleccionado, 
-                    totalPagado: precioSeleccionado, 
+                    granTotal: precioFinal,
+                    totalLiquidado: precioFinal, 
+                    totalPagado: precioFinal, 
                     codigo: codigoGenerado,
                     timestampCompra: ahora.getTime(), 
                     timestampExpiracion: fechaExpiracion.getTime(),
@@ -158,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 set(ticketRef, datosReserva).then(() => {
                     localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
                     localStorage.removeItem('cajonTemporal');
-                    window.location.href = 'ticket.html'; // BOOM! Ticket generado
+                    window.location.href = 'ticket.html'; 
                 }).catch((error) => {
                     console.error("Error al guardar:", error);
                     alert("Hubo un error de conexión.");
@@ -166,6 +184,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     btnFinalizar.textContent = "Pagar y Generar Código";
                 });
             }); 
-        }, 1500); // 1.5s de delay simulando la conexión al banco
+        }, 1500); 
     });
 });
