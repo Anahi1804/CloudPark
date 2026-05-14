@@ -3,8 +3,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getDatabase, ref, onValue, set, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// 🔴 AQUÍ ESTÁ EL ARREGLO: Agregamos addDoc y deleteDoc a la lista de importación
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// 🔴 AQUÍ AGREGAMOS updateDoc:
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB97Nlac70vu_rc_6XqCGPkfMa7rHCjkBk",
@@ -17,10 +17,10 @@ const db = getDatabase(app);
 const auth = getAuth(app); 
 const firestoreDB = getFirestore(app); 
 
-// 🔴 Y AQUÍ TAMBIÉN: Los agregamos a la lista de exportación final
+// 🔴 Y LO EXPORTAMOS AQUÍ AL FINAL:
 export { 
     db, auth, firestoreDB, 
     ref, onValue, set, update, get, runTransaction, 
     signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, 
-    doc, setDoc, getDoc, collection, getDocs, addDoc, deleteDoc 
+    doc, setDoc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc 
 };
