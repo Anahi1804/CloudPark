@@ -130,44 +130,48 @@ document.addEventListener('DOMContentLoaded', () => {
             let etiqueta = 'LIBRE';
             let brillo = 'none';
 
-            // 🚨 LÓGICA CLASIFICADORA DEL ADMIN
+            // 🚨 MATRIZ DE CLASIFICACIÓN CORREGIDA
             if (estadoSensor === 'ocupado') {
-                if (!ticketInfo || ticketInfo.estado === 'reservado') {
-                    // 🟠 OBSTRUIDO: Hay auto físico, pero el sistema no reconoce un ticket válido cruzando la caseta
+                if (ticketInfo && ticketInfo.estado === 'multado') {
+                    // 💗 MULTADO (Detectado físicamente)
+                    colorFondo = 'rgba(255, 0, 255, 0.1)';
+                    colorBorde = '#FF00FF'; 
+                    colorTexto = '#FF00FF';
+                    etiqueta = 'MULTADO';
+                    brillo = '0 0 15px rgba(255, 0, 255, 0.4)';
+                } else if (!ticketInfo || ticketInfo.estado === 'reservado') {
+                    // 🟠 OBSTRUIDO
                     colorFondo = 'rgba(255, 149, 0, 0.15)'; 
                     colorBorde = '#FF9500';
                     colorTexto = '#FF9500';
                     etiqueta = 'OBSTRUIDO';
-                    brillo = 'inset 0 0 15px rgba(255, 149, 0, 0.5)';
                 } else {
                     // 🔴 OCUPADO NORMAL
                     colorFondo = 'rgba(255, 69, 58, 0.15)'; 
                     colorBorde = 'var(--danger-neon)';
                     colorTexto = 'var(--danger-neon)';
-                    etiqueta = ticketInfo.estado === 'multado' ? 'MULTADO' : 'OCUPADO';
-                    if(ticketInfo.estado === 'multado') colorBorde = '#FF00FF'; // Magenta multado
+                    etiqueta = 'OCUPADO';
                 }
             } else {
+                // Sensor libre, pero veamos el estado digital
                 if (ticketInfo) {
-                    if (ticketInfo.estado === 'en_uso') {
-                        // 🟣 EN CAMINO 
+                    if (ticketInfo.estado === 'multado') {
+                        // 🟣 MULTADO (Ya no está en el cajón, pero sigue en el sistema)
+                        colorFondo = 'rgba(191, 90, 242, 0.1)';
+                        colorBorde = '#FF00FF'; 
+                        colorTexto = '#FF00FF';
+                        etiqueta = 'MULTA PENDIENTE';
+                    } else if (ticketInfo.estado === 'en_uso') {
+                        // 🟣 EN CAMINO
                         colorFondo = 'rgba(191, 90, 242, 0.1)';
                         colorBorde = '#BF5AF2'; 
                         colorTexto = '#BF5AF2';
                         etiqueta = 'EN TRÁNSITO';
-                        brillo = 'inset 0 0 10px rgba(191, 90, 242, 0.3)';
                     } else if (ticketInfo.estado === 'reservado') {
-                        // 🟡 RESERVADO 
+                        // 🟡 RESERVADO
                         colorFondo = 'rgba(255, 214, 10, 0.1)';
                         colorBorde = '#FFD60A'; 
-                        colorTexto = '#FFD60A';
                         etiqueta = 'RESERVADO';
-                    } else if (ticketInfo.estado === 'pagado') {
-                        // 🟢 SALIENDO
-                        colorFondo = 'rgba(50, 215, 75, 0.1)';
-                        colorBorde = 'var(--success-neon)';
-                        colorTexto = 'var(--success-neon)';
-                        etiqueta = 'SALIENDO';
                     }
                 }
             }

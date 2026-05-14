@@ -49,23 +49,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cajonesElementos.forEach(cajon => {
             const numero = cajon.querySelector('.numero-cajon').textContent;
-            const estadoSensor = equivalencias[numero]; // "libre" o "ocupado"
-            const estadoTicket = infoTickets[numero]; // "reservado", "en_uso", "pagado"...
+            const estadoSensor = equivalencias[numero]; 
+            const estadoTicket = infoTickets[numero]; 
 
             cajon.classList.remove('disponible', 'ocupado', 'reservado', 'en-camino', 'seleccionado');
 
-            // 🚀 TU NUEVA MATRIZ DE COLORES:
+            // 🚀 LÓGICA DE ESTADOS ACTUALIZADA
             if (estadoSensor === 'ocupado') {
-                cajon.classList.add('ocupado'); // Rojo para el usuario (siempre)
+                cajon.classList.add('ocupado'); // Rojo (Físicamente ahí)
                 if (cajonSeleccionado === numero) resetearSeleccion();
-            } else if (estadoTicket === 'en_uso') {
-                cajon.classList.add('en-camino'); // Morado (Pasó caseta pero no llega)
+            } 
+            // 🟣 NUEVO: Si está 'en_uso' o 'multado', aparece 'En camino' para el usuario
+            else if (estadoTicket === 'en_uso' || estadoTicket === 'multado') {
+                cajon.classList.add('en-camino'); 
                 if (cajonSeleccionado === numero) resetearSeleccion();
-            } else if (estadoTicket === 'reservado') {
-                cajon.classList.add('reservado'); // Amarillo (Comprado sin llegar)
+            } 
+            else if (estadoTicket === 'reservado') {
+                cajon.classList.add('reservado'); // Amarillo
                 if (cajonSeleccionado === numero) resetearSeleccion();
-            } else {
-                cajon.classList.add('disponible'); // Verde (Libre digital y físicamente)
+            } 
+            else {
+                cajon.classList.add('disponible'); // Verde
                 if (cajonSeleccionado === numero) cajon.classList.add('seleccionado');
             }
         });
@@ -74,10 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Lógica de clics
     cajonesElementos.forEach(cajon => {
         cajon.addEventListener('click', () => {
-            // No dejar tocar si está ocupado o reservado por alguien más
-            if (cajon.classList.contains('ocupado') || cajon.classList.contains('reservado')) return;
+            // 🛡️ CORRECCIÓN: Bloqueamos la selección si el cajón no está disponible
+            // Ahora también bloqueamos 'en-camino'
+            if (cajon.classList.contains('ocupado') || 
+                cajon.classList.contains('reservado') || 
+                cajon.classList.contains('en-camino')) {
+                return; 
+            }
 
             cajonesElementos.forEach(c => c.classList.remove('seleccionado'));
+            cajon.classList.add('seleccionado');
             cajon.classList.add('seleccionado');
             cajonSeleccionado = cajon.querySelector('.numero-cajon').textContent;
 
