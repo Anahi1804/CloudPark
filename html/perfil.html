@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mi Perfil - CloudPark</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/auth.css">
+    <style>
+        .seccion-perfil {
+            background: var(--surface);
+            border: 1px solid var(--border-dark);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .titulo-seccion {
+            font-size: 1.1rem; color: #fff; margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body class="bg-app">
+    <main class="mobile-container layout-fluido">
+        
+        <header class="app-header" style="padding: 2.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border-dark);">
+            <a href="dashboard.html" class="btn-volver" title="Volver al inicio" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-dark); background: var(--surface); color: white; text-decoration: none;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </a>
+            <div class="header-titulo" style="text-align: center;">
+                <h2 style="margin: 0; font-size: 1.3rem; color: white;">Mi Perfil</h2>
+                <p style="margin: 0; font-size: 0.75rem; color: var(--spot-selected); text-transform: uppercase;">Ajustes de Cuenta</p>
+            </div>
+            <div style="width: 40px;"></div> 
+        </header>
+
+        <div style="padding: 1.5rem;">
+            <section class="seccion-perfil">
+                <h3 class="titulo-seccion">Mis Datos</h3>
+                <form id="form-editar-perfil" class="form-dark" onsubmit="event.preventDefault();">
+                    
+                    <div class="campo-input-wrapper">
+                        <label>Nombre Completo</label>
+                        <div class="input-con-icono">
+                            <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            <input type="text" id="edit-nombre" required>
+                        </div>
+                    </div>
+
+                    <div class="campo-input-wrapper" style="margin-top: 1rem;">
+                        <label>Placa Principal</label>
+                        <div class="input-con-icono">
+                            <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="2" ry="2"></rect><circle cx="7" cy="12" r="1"></circle><circle cx="17" cy="12" r="1"></circle></svg>
+                            <input type="text" id="edit-placa" style="text-transform: uppercase;" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-guardar-perfil" class="btn-neon" style="margin-top: 1.5rem; border-radius: 12px; padding: 1rem;">Guardar Cambios</button>
+                    <div id="mensaje-perfil" class="mensaje-terminal oculto" style="margin-top: 1rem;"></div>
+                </form>
+            </section>
+
+            <section class="seccion-perfil">
+                <h3 class="titulo-seccion">Métodos de Pago</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Próximamente podrás agregar tus tarjetas aquí (Fase 4).</p>
+                </section>
+        </div>
+
+    </main>
+
+    <script type="module" src="../js/perfil.js"></script>
+</body>
+</html>
