@@ -1,15 +1,23 @@
 // js/perfil.js
-import { auth, firestoreDB, doc, getDoc, updateDoc, onAuthStateChanged } from './firebase-config.js';
+import { auth, firestoreDB, doc, getDoc, updateDoc, onAuthStateChanged, collection, addDoc, getDocs, deleteDoc } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Variables del Formulario de Perfil
     const inputNombre = document.getElementById('edit-nombre');
     const inputPlaca = document.getElementById('edit-placa');
     const formPerfil = document.getElementById('form-editar-perfil');
-    const btnGuardar = document.getElementById('btn-guardar-perfil');
+    const btnGuardarPerfil = document.getElementById('btn-guardar-perfil');
     const mensajeUI = document.getElementById('mensaje-perfil');
+
+    // Variables de la Billetera de Tarjetas
+    const listaTarjetasUI = document.getElementById('lista-tarjetas');
+    const formTarjeta = document.getElementById('form-nueva-tarjeta');
+    const btnMostrarForm = document.getElementById('btn-mostrar-form-tarjeta');
+    const btnCancelarTarjeta = document.getElementById('btn-cancelar-tarjeta');
 
     let usuarioActualUID = null;
 
+    // Función auxiliar para mostrar alertas de UX
     function mostrarMensaje(mensaje, tipo) {
         mensajeUI.textContent = mensaje;
         mensajeUI.className = 'mensaje-terminal'; 
@@ -18,29 +26,110 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { mensajeUI.classList.add('oculto'); }, 4000);
     }
 
-    // 1. Cargar los datos del usuario actual
+    // --- 1. CARGAR DATOS AL ENTRAR ---
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             usuarioActualUID = user.uid;
-            try {
-                const docRef = doc(firestoreDB, "usuarios", usuarioActualUID);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const datos = docSnap.data();
-                    inputNombre.value = datos.nombre || "";
-                    inputPlaca.value = datos.placa || "";
-                }
-            } catch (error) {
-                console.error("Error al cargar perfil:", error);
-            }
+            cargarDatosUsuario();
+            cargarTarjetas(); // 💳 Carga la billetera
         } else {
-            // Si nadie inició sesión, lo botamos
             window.location.href = '../index.html';
         }
     });
 
-    // 2. Guardar los cambios con validación
+    async function cargarDatosUsuario() {
+        const docRef = doc(firestoreDB, "usuarios", usuarioActualUID);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            inputNombre.value = docSnap.data().nombre || "";
+            inputPlaca.value = docSnap.data().placa || "";
+        }
+    }
+
+    async function cargarTarjetas() {
+        listaTarjetasUI.innerHTML = "";
+        // Buscamos en la sub-colección 'metodos_pago'
+        const tarjetasRef = collection(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago");
+        const querySnapshot = await getDocs(tarjetasRef);
+
+        if (querySnapshot.empty) {
+            listaTarjetasUI.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center;">No tienes tarjetas registradas.</p>`;
+            return;
+        }
+
+        querySnapshot.forEach((docTarj) => {
+            const t = docTarj.data();
+            const id = docTarj.id;
+            // Solo mostramos los últimos 4 dígitos
+            const ultimosCuatro = t.numero.slice(-4);
+            
+            const cardDiv = document.createElement('div');
+            cardDiv.style = "background: rgba(255,255,255,0.05); border: 1px solid var(--border-dark); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;";
+            cardDiv.innerHTML = `
+                <div>
+                    <strong style="color: white; font-size: 0.9rem;">${t.nombreCard}</strong><br>
+                    <span style="color: var(--spot-selected); font-family: monospace;">**** **** **** ${ultimosCuatro}</span>
+                </div>
+                <button class="btn-borrar-tarjeta" data-id="${id}" style="background: transparent; border: none; color: var(--danger-neon); cursor: pointer;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            `;
+            listaTarjetasUI.appendChild(cardDiv);
+        });
+
+        // Evento para borrar tarjetas
+        document.querySelectorAll('.btn-borrar-tarjeta').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if(confirm("¿Eliminar este método de pago?")) {
+                    await deleteDoc(doc(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago", btn.dataset.id));
+                    cargarTarjetas();
+                }
+            });
+        });
+    }
+
+    // --- 2. MOSTRAR / OCULTAR FORMULARIO BILLETERA ---
+    btnMostrarForm.addEventListener('click', () => {
+        formTarjeta.classList.remove('oculto');
+        btnMostrarForm.classList.add('oculto');
+    });
+
+    btnCancelarTarjeta.addEventListener('click', () => {
+        formTarjeta.classList.add('oculto');
+        btnMostrarForm.classList.remove('oculto');
+    });
+
+    // --- 3. GUARDAR NUEVA TARJETA ---
+    formTarjeta.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const num = document.getElementById('card-numero').value.replace(/\s/g, '');
+        
+        if(num.length < 16) {
+            alert("El número de tarjeta debe tener 16 dígitos.");
+            return;
+        }
+
+        const nuevaCard = {
+            nombreCard: document.getElementById('card-nombre').value,
+            numero: num,
+            exp: document.getElementById('card-exp').value,
+            cvv: document.getElementById('card-cvv').value,
+            fechaRegistro: new Date().getTime()
+        };
+
+        try {
+            const tarjetasRef = collection(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago");
+            await addDoc(tarjetasRef, nuevaCard);
+            formTarjeta.reset();
+            formTarjeta.classList.add('oculto');
+            btnMostrarForm.classList.remove('oculto');
+            cargarTarjetas();
+        } catch (error) {
+            console.error("Error al guardar tarjeta:", error);
+        }
+    });
+
+    // --- 4. GUARDAR / ACTUALIZAR DATOS DE PERFIL ---
     formPerfil.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -54,8 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        btnGuardar.textContent = "Guardando en nube...";
-        btnGuardar.disabled = true;
+        btnGuardarPerfil.textContent = "Guardando en nube...";
+        btnGuardarPerfil.disabled = true;
 
         try {
             const docRef = doc(firestoreDB, "usuarios", usuarioActualUID);
@@ -64,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 placa: nuevaPlaca
             });
 
-            // Actualizamos la memoria local para que la App no tenga que recargar
+            // Actualizamos la memoria local para que el dashboard y el carrito se enteren rápido
             localStorage.setItem('nombreUsuario', nuevoNombre);
             localStorage.setItem('placaUsuario', nuevaPlaca);
 
@@ -74,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mostrarMensaje("Error al guardar cambios.", "error");
         }
 
-        btnGuardar.textContent = "Guardar Cambios";
-        btnGuardar.disabled = false;
+        btnGuardarPerfil.textContent = "Guardar Cambios";
+        btnGuardarPerfil.disabled = false;
     });
 });
