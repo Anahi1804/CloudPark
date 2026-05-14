@@ -59,15 +59,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 cajon.classList.add('ocupado'); // Rojo (Físicamente ahí)
                 if (cajonSeleccionado === numero) resetearSeleccion();
             } 
-            // 🟣 NUEVO: Si está 'en_uso' o 'multado', aparece 'En camino' para el usuario
-            else if (estadoTicket === 'en_uso' || estadoTicket === 'multado') {
-                cajon.classList.add('en-camino'); 
+            // 🟣 CORRECCIÓN AQUÍ: Agregamos "pagado" a los estados de tránsito (En camino)
+            else if (estadoTicket === 'en_uso' || estadoTicket === 'multado' || estadoTicket === 'pagado') {
+                cajon.classList.add('en-camino'); // Morado (Yendo al cajón O yendo a la salida)
                 if (cajonSeleccionado === numero) resetearSeleccion();
-            } 
+            }
+
             else if (estadoTicket === 'reservado') {
                 cajon.classList.add('reservado'); // Amarillo
                 if (cajonSeleccionado === numero) resetearSeleccion();
             } 
+
             else {
                 cajon.classList.add('disponible'); // Verde
                 if (cajonSeleccionado === numero) cajon.classList.add('seleccionado');
