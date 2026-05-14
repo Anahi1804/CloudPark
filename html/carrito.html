@@ -58,20 +58,26 @@
                     <strong id="monto-total" class="monto-neon">$0.00 MXN</strong>
                 </div>
 
-                <!-- NUEVO: Formulario de pago para la reserva -->
-                <form id="form-pago-entrada" onsubmit="event.preventDefault();" style="margin-top: 1.5rem;">
-                    <h4 style="margin-bottom: 0.8rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase;">Método de Pago</h4>
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem;">
-                        <input type="text" placeholder="Nombre en la tarjeta" required style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; width: 100%; box-sizing: border-box; outline: none;">
-                        <input type="text" placeholder="0000 0000 0000 0000" maxlength="19" required style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; width: 100%; box-sizing: border-box; outline: none;">
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" placeholder="MM/AA" maxlength="5" required style="width: 50%; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; box-sizing: border-box; outline: none;">
-                            <input type="text" placeholder="CVV" maxlength="4" required style="width: 50%; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-dark); background: #000; color: white; box-sizing: border-box; outline: none;">
-                        </div>
+                <div class="resumen-caja" style="margin-top: 1.5rem;">
+                    <h2 style="font-size: 1.1rem; color: #fff; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        Método de Pago
+                    </h2>
+                    
+                    <div class="campo-input-wrapper">
+                        <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">SELECCIONA TU TARJETA</label>
+                        <select id="selector-tarjetas" style="width: 100%; padding: 14px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; margin-top: 8px; font-size: 1rem; appearance: none; outline: none;">
+                            <option value="">Cargando tus tarjetas...</option>
+                        </select>
                     </div>
-                    <button type="submit" id="btn-finalizar" class="btn-neon" disabled>Pagar y Generar Código</button>
-                </form>
-            
+                    
+                    <div id="alerta-sin-tarjetas" class="oculto" style="margin-top: 15px; padding: 12px; background: rgba(255, 149, 0, 0.1); border: 1px solid #FF9500; border-radius: 8px; color: #FF9500; font-size: 0.9rem; text-align: center;">
+                        No tienes tarjetas guardadas. <br>
+                        <a href="perfil.html" style="color: #FF9500; font-weight: bold; text-decoration: underline; margin-top: 5px; display: inline-block;">Agrega una en tu perfil</a>
+                    </div>
+                </div>
+                
+                <button id="btn-finalizar-compra" class="btn-neon" style="width: 100%; margin-top: 1.5rem;" disabled>Pagar y Generar Código</button>
             </section>
         </div>
     </main>

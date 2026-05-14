@@ -1,88 +1,137 @@
 // js/carrito.js
-// 1. Importamos las herramientas para escribir en Firebase
-import { db, ref, set, runTransaction } from './firebase-config.js';
+import { auth, db, firestoreDB, ref, set, runTransaction, onAuthStateChanged, collection, getDocs } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const usuarioLogueado = localStorage.getItem('usuarioLogueado');
     const cajonSeleccionado = localStorage.getItem('cajonTemporal');
+    const nombrePaquete = localStorage.getItem('paqueteSeleccionado');
+    const precioSeleccionado = parseFloat(localStorage.getItem('precioSeleccionado') || 0);
+    const minutosPaquete = parseInt(localStorage.getItem('minutosSeleccionados') || 0);
 
-    if (!usuarioLogueado || !cajonSeleccionado) {
-        window.location.href = '../index.html';
+    const txtCajon = document.getElementById('resumen-cajon');
+    const txtPaquete = document.getElementById('resumen-paquete');
+    const txtTotal = document.getElementById('resumen-total');
+    const btnFinalizar = document.getElementById('btn-finalizar-compra');
+    const selectorTarjetas = document.getElementById('selector-tarjetas');
+    const alertaSinTarjetas = document.getElementById('alerta-sin-tarjetas');
+
+    let usuarioLogueado = null;
+    let usuarioActualUID = null;
+
+    if (!cajonSeleccionado || !nombrePaquete) {
+        alert("Faltan datos de la reserva. Regresando...");
+        window.location.href = 'reservas.html';
         return;
     }
 
-    document.getElementById('resumen-usuario').textContent = usuarioLogueado;
-    document.getElementById('resumen-cajon').textContent = cajonSeleccionado;
+    txtCajon.textContent = cajonSeleccionado;
+    txtPaquete.textContent = nombrePaquete;
+    txtTotal.textContent = `$${precioSeleccionado.toFixed(2)} MXN`;
 
-    const selectPaquete = document.getElementById('select-paquete');
-    const textoTotal = document.getElementById('monto-total');
-    const btnFinalizar = document.getElementById('btn-finalizar');
-
-    let precioSeleccionado = 0;
-    let nombrePaquete = "";
-    let minutosPaquete = 0;
-
-    // Detectar cuando el usuario elige un paquete
-    selectPaquete.addEventListener('change', () => {
-        const opcion = selectPaquete.options[selectPaquete.selectedIndex];
-        minutosPaquete = parseInt(opcion.value);
-        precioSeleccionado = parseFloat(opcion.getAttribute('data-precio'));
-        nombrePaquete = opcion.text.split('-')[0].trim(); 
-        
-        textoTotal.textContent = `$${precioSeleccionado.toFixed(2)} MXN`;
-        btnFinalizar.disabled = false;
+    // 1. Verificamos sesión y cargamos tarjetas
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            usuarioLogueado = user.email;
+            usuarioActualUID = user.uid;
+            await cargarTarjetasBilletera();
+        } else {
+            window.location.href = '../index.html';
+        }
     });
 
-    // Generador del código PARK-XXXX
+    // 💳 2. FUNCIÓN PARA LLENAR EL DESPLEGABLE
+    async function cargarTarjetasBilletera() {
+        selectorTarjetas.innerHTML = '<option value="">Selecciona una tarjeta...</option>';
+        try {
+            const tarjetasRef = collection(firestoreDB, "usuarios", usuarioActualUID, "metodos_pago");
+            const snapshot = await getDocs(tarjetasRef);
+
+            if (snapshot.empty) {
+                selectorTarjetas.classList.add('oculto');
+                alertaSinTarjetas.classList.remove('oculto');
+                btnFinalizar.disabled = true; // No puede pagar si no tiene tarjeta
+                btnFinalizar.style.opacity = '0.5';
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                const t = doc.data();
+                const ultimosCuatro = t.numero.slice(-4);
+                const opcion = document.createElement('option');
+                
+                // Guardamos el número completo en el 'value' para analizarlo luego
+                opcion.value = t.numero; 
+                opcion.textContent = `💳 ${t.nombreCard} (**** ${ultimosCuatro})`;
+                selectorTarjetas.appendChild(opcion);
+            });
+        } catch (error) {
+            console.error("Error al cargar tarjetas:", error);
+            selectorTarjetas.innerHTML = '<option value="">Error al cargar billetera</option>';
+        }
+    }
+
     function generarCodigoReserva() {
         const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let codigo = 'PARK-';
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 6; i++) {
             codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
         }
         return codigo;
     }
 
-    // 2. Guardar la compra en la Nube y en el Navegador
-// 2. Guardar la compra en la Nube al ENVIAR el formulario
-    const formPagoEntrada = document.getElementById('form-pago-entrada');
+    // 🚀 3. EL CLIC DE PAGAR (SIMULADOR BANCARIO + CONCURRENCIA)
+    btnFinalizar.addEventListener('click', () => {
+        const numTarjetaSeleccionada = selectorTarjetas.value;
 
-    formPagoEntrada.addEventListener('submit', (e) => {
-        e.preventDefault(); // Evita que la página recargue
+        if (!numTarjetaSeleccionada) {
+            alert("⚠️ Por favor selecciona una tarjeta de tu billetera para proceder con el pago.");
+            return;
+        }
 
-        // Deshabilitamos el botón para que no le den doble clic
+        btnFinalizar.textContent = "Procesando con el banco...";
         btnFinalizar.disabled = true;
-        btnFinalizar.textContent = "Procesando pago con el banco...";
 
-        // Simulamos un retraso de procesamiento de banco de 2 segundos
-// Simulamos un retraso de procesamiento de banco de 2 segundos
+        // --- 🏦 SIMULADOR BANCARIO DE CASOS DE USO ---
         setTimeout(() => {
-            const codigoGenerado = generarCodigoReserva(); 
+            // Caso 1: Fondos Insuficientes
+            if (numTarjetaSeleccionada.endsWith('0000')) {
+                alert("🏦 BANCO RECHAZA: Fondos insuficientes en la tarjeta terminación 0000.");
+                btnFinalizar.disabled = false;
+                btnFinalizar.textContent = "Pagar y Generar Código";
+                return; // Cortamos el flujo aquí
+            }
 
-            // 🛡️ INICIAMOS LA TRANSACCIÓN (El Cadenero)
+            // Caso 2: Tarjeta Bloqueada
+            if (numTarjetaSeleccionada.endsWith('1111')) {
+                alert("🏦 BANCO DECLINA: Tarjeta terminación 1111 bloqueada por seguridad. Contacte a su banco.");
+                btnFinalizar.disabled = false;
+                btnFinalizar.textContent = "Pagar y Generar Código";
+                return; // Cortamos el flujo aquí
+            }
+
+            // Caso 3: PAGO EXITOSO -> Continuamos con el candado de Firebase
+            btnFinalizar.textContent = "Asegurando tu cajón...";
+
+            const codigoGenerado = generarCodigoReserva(); 
             const candadoRef = ref(db, `cajones_bloqueados/${cajonSeleccionado}`);
 
+            // 🛡️ TRANSACCIÓN DE CONCURRENCIA (El Cadenero)
             runTransaction(candadoRef, (estadoActual) => {
                 if (estadoActual === null) {
-                    // ¡El cajón está libre! Le ponemos nuestro código como candado
-                    return codigoGenerado;
+                    return codigoGenerado; // Está libre, lo tomamos
                 } else {
-                    // ¡Alguien más llegó primero en este milisegundo! Abortar.
-                    return; 
+                    return; // Alguien nos ganó
                 }
             }).then((resultadoTransaccion) => {
-                
-                // Si NO logramos poner el candado...
                 if (!resultadoTransaccion.committed) {
-                    alert("¡Lo sentimos! 🤯 Alguien más acaba de reservar este cajón hace un instante. Por favor, selecciona otro.");
+                    alert("¡Lo sentimos! 🤯 Alguien más acaba de comprar este cajón mientras procesábamos tu pago. Tu tarjeta NO ha sido cobrada.");
                     window.location.href = 'reservas.html';
-                    return; // Detenemos todo
+                    return;
                 }
 
-                // ¡SI LLEGAMOS AQUÍ, SOMOS LOS DUEÑOS ABSOLUTOS DEL CAJÓN! 🏆
+                // SOMOS DUEÑOS DEL CAJÓN
                 const ahora = new Date();
                 const fechaExpiracion = new Date(ahora);
-                fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete); // Para probar
+                fechaExpiracion.setSeconds(ahora.getSeconds() + minutosPaquete);
 
                 const datosReserva = {
                     usuario: usuarioLogueado,
@@ -109,15 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 set(ticketRef, datosReserva).then(() => {
                     localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
                     localStorage.removeItem('cajonTemporal');
-                    window.location.href = 'ticket.html';
+                    window.location.href = 'ticket.html'; // BOOM! Ticket generado
                 }).catch((error) => {
                     console.error("Error al guardar:", error);
                     alert("Hubo un error de conexión.");
                     btnFinalizar.disabled = false;
                     btnFinalizar.textContent = "Pagar y Generar Código";
                 });
-            }); // Fin de la transacción
-
-        }, 2000); 
+            }); 
+        }, 1500); // 1.5s de delay simulando la conexión al banco
     });
 });
