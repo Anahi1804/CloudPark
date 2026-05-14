@@ -161,13 +161,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         colorBorde = '#FF00FF'; 
                         colorTexto = '#FF00FF';
                         etiqueta = 'MULTA PENDIENTE';
-                    } else if (ticketInfo.estado === 'en_uso') {
-                        // 🟣 EN CAMINO
+                    } 
+                    else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
+                        // 🟣 EN CAMINO / SALIENDO
                         colorFondo = 'rgba(191, 90, 242, 0.1)';
                         colorBorde = '#BF5AF2'; 
                         colorTexto = '#BF5AF2';
                         etiqueta = 'EN TRÁNSITO';
-                    } else if (ticketInfo.estado === 'reservado') {
+                        brillo = 'inset 0 0 10px rgba(191, 90, 242, 0.3)';
+                    } 
+                    else if (ticketInfo.estado === 'reservado') {
                         // 🟡 RESERVADO
                         colorFondo = 'rgba(255, 214, 10, 0.1)';
                         colorBorde = '#FFD60A'; 
