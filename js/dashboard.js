@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Escuchar el estado de seguridad de Firebase en tiempo real
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            // ¡El usuario es legítimo! Vamos a buscar su expediente a Firestore
+
             const docRef = doc(firestoreDB, "usuarios", user.uid);
             const docSnap = await getDoc(docRef);
 
@@ -21,11 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombreUsuario.textContent = datosUsuario.nombre;
                 if (placaUsuario) placaUsuario.textContent = datosUsuario.placa;
                 
-                // NUEVO: Guardamos esto en la memoria local para el Carrito
+                // Guardamos esto en la memoria local para el Carrito
                 localStorage.setItem('nombreUsuario', datosUsuario.nombre);
                 localStorage.setItem('placaUsuario', datosUsuario.placa);
                 
-                // Opcional: Guardamos su correo en local solo por si otros scripts viejos lo necesitan temporalmente
+                // Guardamos su correo en local solo por si otros scripts viejos lo necesitan temporalmente
                 localStorage.setItem('usuarioLogueado', datosUsuario.correo);
             }
         } else {

@@ -54,12 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             cajon.classList.remove('disponible', 'ocupado', 'reservado', 'en-camino', 'seleccionado');
 
-            // 🚀 LÓGICA DE ESTADOS ACTUALIZADA
+            // LÓGICA DE ESTADOS ACTUALIZADA
             if (estadoSensor === 'ocupado') {
-                cajon.classList.add('ocupado'); // Rojo (Físicamente ahí)
+                cajon.classList.add('ocupado');
                 if (cajonSeleccionado === numero) resetearSeleccion();
             } 
-            // 🟣 CORRECCIÓN AQUÍ: Agregamos "pagado" a los estados de tránsito (En camino)
+            //  CORRECCIÓN AQUÍ: Agregamos "pagado" a los estados de tránsito (En camino)
             else if (estadoTicket === 'en_uso' || estadoTicket === 'multado' || estadoTicket === 'pagado') {
                 cajon.classList.add('en-camino'); // Morado (Yendo al cajón O yendo a la salida)
                 if (cajonSeleccionado === numero) resetearSeleccion();
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Lógica de clics
     cajonesElementos.forEach(cajon => {
         cajon.addEventListener('click', () => {
-            // 🛡️ CORRECCIÓN: Bloqueamos la selección si el cajón no está disponible
+            // Bloqueamos la selección si el cajón no está disponible
             // Ahora también bloqueamos 'en-camino'
             if (cajon.classList.contains('ocupado') || 
                 cajon.classList.contains('reservado') || 

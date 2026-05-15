@@ -1,7 +1,7 @@
 // js/auth.js
 import { auth } from './firebase-config.js';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-console.log("🔥 1. Archivo auth.js cargado e iniciando...");
+console.log(" 1. Archivo auth.js cargado e iniciando...");
 
 const formulario = document.getElementById('formulario-login');
 const mensajeError = document.getElementById('mensaje-error');
@@ -13,7 +13,7 @@ if (formulario) {
     console.log("✅ 2. Formulario detectado correctamente en el HTML.");
     
     formulario.addEventListener('submit', (evento) => {
-        // ¡Detenemos la recarga!
+        // Detenemos la recarga
         evento.preventDefault(); 
         console.log("🛑 3. Clic detectado. Recarga bloqueada.");
 
@@ -35,7 +35,6 @@ if (formulario) {
                 console.log("🎉 5. ¡ÉXITO! Firebase autorizó el acceso.");
                 localStorage.setItem('usuarioLogueado', credenciales.user.email);
                 
-                // IMPORTANTE: Asegúrate de que esta ruta sea correcta para tu proyecto
                 window.location.href = 'html/dashboard.html'; 
             })
             .catch((error) => {

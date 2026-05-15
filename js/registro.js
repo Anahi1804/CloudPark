@@ -32,13 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
     formulario.addEventListener('submit', (evento) => {
         evento.preventDefault();
 
-        // 1. Obtener los datos del formulario (¡Ahora sí encontrará el reg-password!)
+        // 1. Obtener los datos del formulario
         const nombre = document.getElementById('reg-nombre').value.trim();
         const placa = document.getElementById('reg-placa').value.trim().toUpperCase();
         const correo = document.getElementById('reg-correo').value.trim();
         const password = inputPassword.value; 
 
-        // --- 🛡️ VALIDACIONES ESTRICTAS ---
+        // --- VALIDACIONES ESTRICTAS ---
         const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!regexCorreo.test(correo)) {
             mostrarMensaje("Por favor, ingresa un correo electrónico válido.", "error");

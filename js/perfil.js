@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (user) {
             usuarioActualUID = user.uid;
             cargarDatosUsuario();
-            cargarTarjetas(); // 💳 Carga la billetera
+            cargarTarjetas(); //  Carga la billetera
         } else {
             window.location.href = '../index.html';
         }
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- 3. GUARDAR NUEVA TARJETA Y VALIDACIONES ---
 
-    // 🌟 UX: Formateo automático mientras el usuario escribe
+    // UX: Formateo automático mientras el usuario escribe
     const inputCardNum = document.getElementById('card-numero');
     const inputCardExp = document.getElementById('card-exp');
     const inputCardCvv = document.getElementById('card-cvv');
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 🛡️ Lógica de Guardado con Seguridad Bancaria
+    // Lógica de Guardado con Seguridad Bancaria
     formTarjeta.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -136,21 +136,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const exp = inputCardExp.value;
         const cvv = inputCardCvv.value;
 
-        // 🚨 1. Validar Número de Tarjeta (Exactamente 16 números)
+        //  1. Validar Número de Tarjeta (Exactamente 16 números)
         const regexNum = /^\d{16}$/;
         if (!regexNum.test(numLimpio)) {
             alert("❌ Número inválido: La tarjeta debe tener exactamente 16 números.");
             return;
         }
 
-        // 🚨 2. Validar Fecha de Vencimiento (Mes 01-12, Año 2 números)
+        //  2. Validar Fecha de Vencimiento (Mes 01-12, Año 2 números)
         const regexExp = /^(0[1-9]|1[0-2])\/\d{2}$/;
         if (!regexExp.test(exp)) {
             alert("❌ Fecha inválida: Usa el formato de mes válido y año (Ej. 12/25).");
             return;
         }
 
-        // 🚨 3. Validar CVV (Exactamente 3 o 4 números)
+        // 3. Validar CVV (Exactamente 3 o 4 números)
         const regexCvv = /^\d{3,4}$/;
         if (!regexCvv.test(cvv)) {
             alert("❌ CVV inválido: Deben ser 3 o 4 números de seguridad.");
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const nuevoNombre = inputNombre.value.trim();
         const nuevaPlaca = inputPlaca.value.trim().toUpperCase();
 
-        // 🛡️ VALIDACIÓN DE PLACA ESTRICTA
+        //  VALIDACIÓN DE PLACA ESTRICTA
         const regexPlaca = /^[A-Z]{3,4}-\d{2,4}$/;
         if (!regexPlaca.test(nuevaPlaca)) {
             mostrarMensaje("Placa inválida. Usa formato real (Ej. YZA-1234)", "error");

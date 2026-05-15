@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getDatabase, ref, onValue, set, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// 🔴 AQUÍ AGREGAMOS updateDoc:
+
 import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -17,7 +17,7 @@ const db = getDatabase(app);
 const auth = getAuth(app); 
 const firestoreDB = getFirestore(app); 
 
-// 🔴 Y LO EXPORTAMOS AQUÍ AL FINAL:
+// LO EXPORTAMOS AQUÍ AL FINAL:
 export { 
     db, auth, firestoreDB, 
     ref, onValue, set, update, get, runTransaction, 

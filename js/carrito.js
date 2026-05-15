@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const txtTotal = document.getElementById('monto-total');
     const selectPaquete = document.getElementById('select-paquete');
     
-    const btnFinalizar = document.getElementById('btn-finalizar-compra'); // <-- ID Corregido
+    const btnFinalizar = document.getElementById('btn-finalizar-compra'); 
     const selectorTarjetas = document.getElementById('selector-tarjetas');
     const alertaSinTarjetas = document.getElementById('alerta-sin-tarjetas');
 
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         txtTotal.textContent = `$${precioFinal.toFixed(2)} MXN`;
         
-        // Habilitamos el botón SOLO si seleccionó paquete Y tiene tarjetas (lo revisamos más abajo)
+        // Habilitamos el botón SOLO si seleccionó paquete Y tiene tarjetas
         if (selectorTarjetas.options.length > 1) { 
             btnFinalizar.disabled = false;
         }
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💳 2. FUNCIÓN PARA LLENAR EL DESPLEGABLE
+    // 2. FUNCIÓN PARA LLENAR EL DESPLEGABLE
     async function cargarTarjetasBilletera() {
         selectorTarjetas.innerHTML = '<option value="">Selecciona una tarjeta...</option>';
         try {
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return codigo;
     }
 
-    // 🚀 3. EL CLIC DE PAGAR (SIMULADOR BANCARIO + CONCURRENCIA)
+    // 3. EL CLIC DE PAGAR (SIMULADOR BANCARIO + CONCURRENCIA)
     btnFinalizar.addEventListener('click', () => {
         const numTarjetaSeleccionada = selectorTarjetas.value;
 
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnFinalizar.textContent = "Procesando con el banco...";
         btnFinalizar.disabled = true;
 
-        // --- 🏦 SIMULADOR BANCARIO DE CASOS DE USO ---
+        // SIMULADOR BANCARIO DE CASOS DE USO ---
         setTimeout(() => {
             // Caso 1: Fondos Insuficientes
             if (numTarjetaSeleccionada.endsWith('0000')) {
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const codigoGenerado = generarCodigoReserva(); 
             const candadoRef = ref(db, `cajones_bloqueados/${cajonSeleccionado}`);
 
-            // 🛡️ TRANSACCIÓN DE CONCURRENCIA
+            // TRANSACCIÓN DE CONCURRENCIA
             runTransaction(candadoRef, (estadoActual) => {
                 if (estadoActual === null) {
                     return codigoGenerado; 
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // SOMOS DUEÑOS DEL CAJÓN
+
                 const ahora = new Date();
                 const fechaExpiracion = new Date(ahora);
                 fechaExpiracion.setSeconds(ahora.getSeconds() + minutosFinales);

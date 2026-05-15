@@ -27,33 +27,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ticket = snapshot.val();
 
-            // REGLA DE ORO: ¿Ya pagó en su celular?
+
             if (ticket.estado !== "pagado") {
                 mostrarError("Aún no has liquidado tu estancia. Por favor paga desde tu app móvil.");
                 return;
             }
 
-            // NUEVA REGLA: ¿Pasaron más de 15 minutos desde que pagó?
+
             const ahora = new Date().getTime();
-            // TRUCO DEV: 15 minutos reales son 900,000 ms. 
-            // Para probarlo AHORITA, lo pondremos en 30 segundos (30000 ms).
+            // 15 minutos reales son 900,000 ms. 
+            // Para probarlo lo pondremos en 30 segundos (30000 ms).
             const limiteTolerancia = 30000; 
 
             if (ticket.timestampPagado && (ahora - ticket.timestampPagado) > limiteTolerancia) {
                 mostrarError("⏳ Tiempo de salida excedido. Se aplicará multa.");
                 
-                // CASTIGO: Solo actualizamos el estado, dejamos intacto el timestampPagado
+                // Solo actualizamos el estado, dejamos intacto el timestampPagado
                 update(ticketRef, {
-                    estado: "multado" // <-- Eliminamos la línea que decía timestampPagado: null
+                    estado: "multado" 
                 });
                 
                 setTimeout(() => {
                     pantallaEstado.classList.add('oculto');
                     reactivarInterfaz();
                 }, 5000);
-                return; // Cortamos el proceso para que NO abra la pluma
+                return; 
             }
-            // ¡ÉXITO! El cliente ya pagó. Procedemos con la Mudanza de Datos.
+            // El cliente ya pagó. Procedemos con la Mudanza de Datos.
             textoEstado.textContent = "Archivando ticket...";
 
             // 1. Preparamos el documento para Firestore (Historial Histórico)
@@ -70,11 +70,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setDoc(historialRef, datosHistorial).then(() => {              
                 return set(ticketRef, null);
             }).then(() => {
-                // 🔓 NUEVO: Quitamos el candado de concurrencia
+                //  Quitamos el candado de concurrencia
                 return set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
             }).then(() => {
 
-                // 🦾 ¡LA MAGIA: Mandamos la orden al motor de SALIDA!
+                // Mandamos la orden al motor de SALIDA!
                 set(ref(db, 'control_plumas/salida'), 'abrir');
                 
                 // 4. Mostramos éxito en la pantalla y abrimos pluma

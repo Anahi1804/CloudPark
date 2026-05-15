@@ -21,5 +21,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tkt-codigo').textContent = reserva.codigo;
     document.getElementById('tkt-total').textContent = `$${reserva.totalPagado.toFixed(2)} MXN`;
 
-    // Nota: El código PARK-XXXX ya viene generado desde carrito.js
+    //  El código PARK-XXXX ya viene generado desde carrito.js
 });

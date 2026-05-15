@@ -52,14 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ahora > ticket.timestampExpiracion) {
                 // Sanción: Pasamos su ticket a estado 'vencido' para que ya no sirva
                 update(ticketRef, { estado: "vencido" });
-                // 🔓 Quitamos el candado para que alguien más pueda comprar el lugar
+                // Quitamos el candado para que alguien más pueda comprar el lugar
                 set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
                 mostrarEstado("Tu tiempo de tolerancia ha expirado. Debes generar otra reserva.", "error");
                 reactivarBoton();
                 return;
             }
 
-            // 3. ¡ÉXITO! Pasó todas las validaciones de seguridad
+
             // ESTADO 3: Cambiamos a "en_uso" y guardamos cuándo entró realmente para cobrarle después
             update(ticketRef, { 
                 estado: "en_uso"

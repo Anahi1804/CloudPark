@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 2. LECTURA DEL TICKET Y RELOJ (Intacto)
+    // 2. LECTURA DEL TICKET Y RELOJ 
     onValue(ticketRef, (snapshot) => {
         const ticketFisico = snapshot.val();
 
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso D: Multado
+        // Caso C: Multado
         if (ticketFisico.estado === "multado") {
             esPagoMulta = true;
             clearInterval(intervaloReloj);
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return; 
         }
 
-        // Caso C: En Uso
+        // Caso D: En Uso
         if (ticketFisico.estado === "en_uso") {
             esPagoMulta = false;
             
