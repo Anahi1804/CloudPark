@@ -23,14 +23,10 @@
                 <button id="btn-emergencia-salida" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">
                     Abrir Salida
                 </button>
-                <button id="btn-auditoria-rmi" style="background: linear-gradient(135deg, #8A2BE2, #4B0082); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
-                    Auditoría
-                </button>
-                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir</a>
+                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir del Panel</a>
             </div>
         </header>
 
-        <!-- Métricas Rápidas -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
             <div class="stats-card">
                 <h3>Ingresos Totales</h3>
@@ -43,26 +39,22 @@
         </div>
 
         <div class="admin-grid">
-            <!-- Columna Izquierda: Mapa Físico -->
             <section>
                 <h2>Monitor de Cajones</h2>
                 <div class="stats-card" style="margin-top: 1rem; padding: 1.5rem;">
-                    <!-- Aquí el JS reescribirá todo el contenido -->
                     <div id="admin-mapa-container">
                         <p style="color: var(--text-muted); font-size: 0.9rem;">Sincronizando sensores con la nube...</p>
                     </div>
                 </div>
             </section>
 
-            <!-- Columna Derecha: Detalle del Vehículo -->
             <section>
                 <h2>Inspección de Vehículo</h2>
-                <!-- Le dimos una altura mínima y centramos el texto para que no se vea aplastado cuando esté vacío -->
-                <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left; min-height: 180px; display: flex; align-items: center; justify-content: center;">
+                <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left; min-height: 180px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
                     <p style="color: var(--text-muted); text-align: center; margin: 0;">
                         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px; opacity: 0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <br>
-                        Haz clic en un cajón ocupado<br>para espiar los datos.
+                        Haz clic en un cajón ocupado<br>para espiar los datos y ver opciones de control.
                     </p>
                 </div>
             </section>
@@ -70,26 +62,27 @@
             <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 2rem; border-top: 3px solid var(--spot-selected);">
                 <h3 class="titulo-seccion" style="display: flex; align-items: center; gap: 8px;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    Buscador de Emergencia
+                    Centro de Resoluciones (Plan B)
                 </h3>
                 <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
-                    Usa esta herramienta si el cliente se quedó sin batería o perdió su código con la placa del carro.
+                    Busca un cliente activo por placa si se quedó sin batería o perdió su código.
                 </p>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234 o PARK-ABCD)" style="flex: 1; min-width: 250px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; text-transform: uppercase;">
+                    <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234)" style="flex: 1; min-width: 250px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; text-transform: uppercase;">
                     <button id="btn-buscar-admin" class="btn-neon" style="padding: 12px 24px; border-radius: 10px;">Buscar Cliente</button>
                 </div>
 
-                <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed var(--border-dark);">
-                    </div>
+                <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed var(--border-dark);"></div>
             </section>
-
         </div>
-        <!-- Tabla del Historial de Firestore -->
+
         <section style="margin-top: 3rem;">
-            <h2>Registro Histórico de Pagos</h2>
-            <!-- Este div evita el desbordamiento -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-dark); margin-bottom: 1rem; padding-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos</h2>
+                <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa o cliente..." style="padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; min-width: 250px;">
+            </div>
+            
             <div style="width: 100%; overflow-x: auto; background: var(--surface-dark); border-radius: 12px; border: 1px solid var(--border-dark);">
                 <table class="tabla-historial" style="min-width: 900px;">
                     <thead>

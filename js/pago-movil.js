@@ -1,5 +1,5 @@
 // js/pago-movil.js
-import { db, ref, onValue, update, auth, firestoreDB, onAuthStateChanged, collection, getDocs } from './firebase-config.js';
+import { db, ref, onValue, get, update, auth, firestoreDB, onAuthStateChanged, collection, getDocs } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const ticketGuardado = localStorage.getItem('ticketActual');
@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const formPago = document.getElementById('form-pago-simulado');
     const btnProcesar = document.getElementById('btn-procesar-pago');
     
-    // Variables Billetera
     const selectorTarjetas = document.getElementById('selector-tarjetas');
     const alertaSinTarjetas = document.getElementById('alerta-sin-tarjetas');
     let usuarioActualUID = null;
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let hardwareListenerActivo = false;
     let esPagoMulta = false;
 
-    // Cajitas financieras
     let historicoReserva = 0;
     let historicoEstacionamiento = 0;
     let historicoMulta = 0;
@@ -63,22 +61,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const t = doc.data();
                 const ultimosCuatro = t.numero.slice(-4);
                 const opcion = document.createElement('option');
-                
                 opcion.value = t.numero; 
                 opcion.textContent = `💳 ${t.nombreCard} (**** ${ultimosCuatro})`;
                 selectorTarjetas.appendChild(opcion);
             });
             
-            // Habilitar botón de pago si no está multado (la lógica de multa lo habilita después)
             if(!esPagoMulta && totalAPagar > 0) btnProcesar.disabled = false;
-            
         } catch (error) {
             console.error("Error al cargar tarjetas:", error);
             selectorTarjetas.innerHTML = '<option value="">Error al cargar billetera</option>';
         }
     }
 
-    // 2. LECTURA DEL TICKET Y RELOJ 
+    // 2. LECTURA DEL TICKET Y RELOJ
     onValue(ticketRef, (snapshot) => {
         const ticketFisico = snapshot.val();
 
@@ -94,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
         historicoMulta = Number(ticketFisico.pagoMulta) || 0;
         historicoPagado = Number(ticketFisico.totalLiquidado) || 0;
 
-        // Caso A: Reservado sin entrar
+        // Caso A: Reservado
         if (ticketFisico.estado === "reservado") {
             relojUI.textContent = "En camino";
             relojUI.style.fontSize = "2.5rem";
@@ -120,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Caso C: Multado
+        // Caso D: Multado
         if (ticketFisico.estado === "multado") {
             esPagoMulta = true;
             clearInterval(intervaloReloj);
@@ -133,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tiempoTolerancia = 30000; 
                 const inicioMulta = ticketFisico.timestampPagado + tiempoTolerancia;
                 
-                const milisegundosRetraso = ahora - inicioMulta;
+                const milisegundosRetraso = Math.max(0, ahora - inicioMulta);
                 const minutosRetraso = Math.floor(milisegundosRetraso / 1000); 
                 
                 const horasUI = Math.floor(minutosRetraso / 60).toString().padStart(2, '0');
@@ -150,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return; 
         }
 
-        // Caso D: En Uso
+        // Caso C: En Uso (ESPERANDO SENSOR)
         if (ticketFisico.estado === "en_uso") {
             esPagoMulta = false;
             
@@ -169,16 +164,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cajonIdHardware = equivalencias[ticketFisico.cajon];
                     const sensorRef = ref(db, `estacionamiento_actual/${cajonIdHardware}`);
                     
-                    onValue(sensorRef, (sensorSnap) => {
-                        const estadoCajon = sensorSnap.val();
-                        if (estadoCajon === "ocupado" && !ticketFisico.timestampIngresoFisico) {
+                    // 🍏 PARCHE SAFARI: Función para forzar la lectura del sensor
+                    const verificarSensorForzado = async () => {
+                        const snap = await get(sensorRef);
+                        const estadoCajon = snap.val();
+                        if (estadoCajon && String(estadoCajon).trim().toLowerCase() === "ocupado") {
                             update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
                         }
+                    };
+
+                    // Escucha normal por si la pantalla está encendida
+                    onValue(sensorRef, (sensorSnap) => {
+                        const estadoCajon = sensorSnap.val();
+                        if (estadoCajon && String(estadoCajon).trim().toLowerCase() === "ocupado" && !ticketFisico.timestampIngresoFisico) {
+                            update(ticketRef, { timestampIngresoFisico: new Date().getTime() });
+                        }
+                    });
+
+                    // 🍏 PARCHE SAFARI: Escucha de Despertar de iOS
+                    document.addEventListener("visibilitychange", () => {
+                        if (document.visibilityState === "visible" && !ticketFisico.timestampIngresoFisico) {
+                            verificarSensorForzado();
+                        }
+                    });
+                    window.addEventListener("focus", () => {
+                        if (!ticketFisico.timestampIngresoFisico) verificarSensorForzado();
                     });
                 }
                 return;
             }
 
+            // RELOJ EN MARCHA
             clearInterval(intervaloReloj); 
             relojUI.style.fontSize = "3.5rem";
             montoUI.style.color = "var(--danger-neon)";
@@ -219,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnProcesar.textContent = "Procesando con banco...";
 
         setTimeout(() => {
-            // SIMULADOR: Fondos Insuficientes
             if (numTarjetaSeleccionada.endsWith('0000')) {
                 alert("🏦 BANCO RECHAZA: Fondos insuficientes en la tarjeta terminación 0000.");
                 btnProcesar.disabled = false;
@@ -227,7 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return; 
             }
 
-            // SIMULADOR: Tarjeta Bloqueada
             if (numTarjetaSeleccionada.endsWith('1111')) {
                 alert("🏦 BANCO DECLINA: Tarjeta terminación 1111 bloqueada por seguridad.");
                 btnProcesar.disabled = false;
@@ -235,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return; 
             }
 
-            // PAGO EXITOSO
             btnProcesar.textContent = "Aprobado. Liberando salida...";
 
             let nuevoEstacionamiento = historicoEstacionamiento;
@@ -255,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pagoMulta: nuevoMulta,
                 granTotal: totalHistorico,
                 timestampPagado: new Date().getTime() 
-            }).then(() => console.log("Pago registrado con éxito desde Billetera Digital."));
+            }).then(() => console.log("Pago registrado con éxito."));
             
         }, 1500);
     });
