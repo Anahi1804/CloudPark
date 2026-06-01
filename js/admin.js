@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-// --- 🗑️ RECOLECTOR DE BASURA (1 Minuto de Tolerancia) ---
+// --- 🗑️ RECOLECTOR DE BASURA SUPER AGRESIVO ---
     let adminTicketsActivos = {};
     let adminEstadoFisico = {};
 
@@ -201,36 +201,40 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let id in adminTicketsActivos) {
             let t = adminTicketsActivos[id];
             
-            // Si tiene estado de reservado y existe su fecha de expiración
             if (t.estado === 'reservado' && t.timestampExpiracion) {
-                // Le sumamos 60,000 milisegundos (1 minuto exacto) de tolerancia
                 const limiteConTolerancia = t.timestampExpiracion + 60000;
-                
-                // Calculamos cuántos segundos le faltan para morir (solo para verlo en consola)
                 const segundosRestantes = Math.floor((limiteConTolerancia - ahora) / 1000);
                 
-                // Mostrar en la consola (F12) la cuenta regresiva (Opcional, para que veas que funciona)
                 if (segundosRestantes > 0 && segundosRestantes <= 60) {
                     console.log(`⏳ Ticket ${id} será eliminado en ${segundosRestantes} segundos...`);
                 }
 
-                // ¡Llegó la hora! El tiempo expiró por completo
-                if (ahora > limiteConTolerancia) {
-                    console.log(`💥 [GARBAGE COLLECTOR] Eliminando reserva fantasma: ${id}`);
+                // Usamos <= 0 para atraparlo incluso si Chrome pausó el reloj por unos segundos
+                if (segundosRestantes <= 0) {
+                    console.log(`💥 [SISTEMA] El ticket ${id} expiró. Ejecutando exterminio...`);
                     
-                    // Borramos DE INMEDIATO de Firebase RTDB
-                    set(ref(db, `tickets_activos/${id}`), null)
-                        .then(() => console.log(`✅ Ticket ${id} borrado de la base de datos.`))
-                        .catch(err => console.error("Error al borrar ticket:", err));
-                    
-                    // Liberamos el cajón bloqueado
-                    set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
-                    
-                    showToast(`El cajón ${t.cajon} se liberó (Cliente nunca llegó)`, 'error');
+                    try {
+                        // 1. Borramos el ticket de la RTDB instantáneamente
+                        set(ref(db, `tickets_activos/${id}`), null)
+                            .then(() => console.log(`✅ Ticket ${id} fulminado de la base de datos.`));
+                        
+                        // 2. Liberamos el candado del cajón
+                        if (t.cajon) {
+                            set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
+                        }
+                        
+                        showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
+                        
+                        // 3. Lo sacamos de nuestra memoria local para no borrarlo 2 veces
+                        delete adminTicketsActivos[id];
+
+                    } catch (error) {
+                        console.error("❌ Error en el Recolector:", error);
+                    }
                 }
             }
         }
-    }, 5000); // Lo bajé a 5 segundos para que sea más reactivo
+    }, 3000); // ⏱️ Lo bajamos a 3 segundos para que sea ultra rápido
 
 
     // --- MATRIZ DE ESTADOS EN TIEMPO REAL ---
