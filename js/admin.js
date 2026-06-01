@@ -1,5 +1,5 @@
 // js/admin.js
-import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue, set, doc, setDoc } from './firebase-config.js';
+import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue, set, doc, setDoc, update } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     onAuthStateChanged(auth, (user) => {
@@ -41,9 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportar = document.getElementById('btn-exportar-csv');
 
     let historialGlobal = []; 
-    let chartInstancia = null; // Variable para la gráfica
+    let chartInstancia = null; 
 
-    // --- CARGAR HISTORIAL, GRÁFICAS Y TABLA ---
+    // --- CARGAR HISTORIAL Y GRÁFICAS ---
     async function cargarHistorial() {
         try {
             const querySnapshot = await getDocs(collection(firestoreDB, "historial_tickets"));
@@ -64,10 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const multa = Number(ticket.pagoMulta) || 0;
                 const sumaTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
 
-                // Sumar para gráfica
-                if (ticket.paquete && paquetesCount[ticket.paquete] !== undefined) {
-                    paquetesCount[ticket.paquete]++;
-                }
+                // 🐛 CORRECCIÓN DE LA GRÁFICA: Ignoramos los emojis buscando la palabra clave
+                const paq = ticket.paquete || "";
+                if (paq.includes('Express')) paquetesCount['Express']++;
+                else if (paq.includes('Estándar')) paquetesCount['Estándar']++;
+                else if (paq.includes('Reunión')) paquetesCount['Reunión']++;
+                else if (paq.includes('Máximo')) paquetesCount['Máximo']++;
 
                 totalTickets++;
                 totalDinero += sumaTotal; 
@@ -76,19 +78,22 @@ document.addEventListener('DOMContentLoaded', () => {
             statTickets.textContent = totalTickets;
             statIngresos.textContent = `$${totalDinero.toFixed(2)}`;
             renderizarTablaHistorial(historialGlobal);
-            dibujarGrafica(paquetesCount);
+            
+            // Dibujamos la dona si hay datos
+            if (totalTickets > 0) dibujarGrafica(paquetesCount);
 
         } catch (error) {
             console.error("Error al cargar historial:", error);
         }
     }
 
-    // Dibujar Gráfica Chart.js
     function dibujarGrafica(conteo) {
-        const ctx = document.getElementById('graficaPaquetes').getContext('2d');
-        if (chartInstancia) chartInstancia.destroy(); // Borrar si ya existe
+        const ctx = document.getElementById('graficaPaquetes');
+        if(!ctx) return; // Por si no ha cargado el HTML
 
-        chartInstancia = new Chart(ctx, {
+        if (chartInstancia) chartInstancia.destroy(); // Limpiamos la anterior
+
+        chartInstancia = new Chart(ctx.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: ['Express', 'Estándar', 'Reunión', 'Máximo'],
@@ -152,7 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarHistorial();
 
-    // Filtro y Exportar
     if(filtroHistorial) {
         filtroHistorial.addEventListener('input', (e) => {
             const texto = e.target.value.toLowerCase();
@@ -186,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- RECOLECTOR DE BASURA AUTOMÁTICO (GARBAGE COLLECTOR) ---
+    // --- 🗑️ RECOLECTOR DE BASURA (1 Minuto de Tolerancia) ---
     let adminTicketsActivos = {};
     let adminEstadoFisico = {};
 
@@ -194,15 +198,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const ahora = new Date().getTime();
         for (let id in adminTicketsActivos) {
             let t = adminTicketsActivos[id];
-            // Si el cliente pagó la reserva pero NUNCA cruzó la pluma y su tiempo expiró
-            if (t.estado === 'reservado' && ahora > t.timestampExpiracion) {
-                console.log(`[SISTEMA] Borrando ticket expirado y no utilizado: ${id}`);
+            
+            // Le agregamos 60,000 milisegundos (1 minuto exacto) a su tiempo de expiración
+            const limiteConTolerancia = t.timestampExpiracion + 60000;
+
+            // Si nunca entró a la caseta ('reservado') Y ya se le pasó el tiempo + 1 minuto... ¡Se borra!
+            if (t.estado === 'reservado' && ahora > limiteConTolerancia) {
+                console.log(`[GARBAGE COLLECTOR] Eliminando reserva fantasma: ${id}`);
                 set(ref(db, `tickets_activos/${id}`), null);
                 set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
-                showToast(`Se liberó el cajón ${t.cajon} (El cliente nunca llegó)`, 'info');
+                
+                showToast(`El cajón ${t.cajon} se liberó (Cliente nunca llegó)`, 'info');
             }
         }
-    }, 10000); // Revisa cada 10 segundos ininterrumpidamente
+    }, 10000); 
 
 
     // --- MATRIZ DE ESTADOS EN TIEMPO REAL ---
@@ -216,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     onValue(sensoresFisicosRef, (snapshot) => {
         adminEstadoFisico = snapshot.val() || {};
-        // Empatar sensor físico con reloj
         const equivalenciasInversas = {
             'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3',
             'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3'
@@ -368,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     set(ref(db, `tickets_activos/${idT}`), null);
                     set(ref(db, `cajones_bloqueados/${caj}`), null);
                     
-                    showToast("Vehículo removido del sistema forzosamente.", "success");
+                    showToast("Vehículo removido del sistema.", "success");
                     infoVehiculo.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Ticket finalizado y cajón liberado.</p>`;
                     cargarHistorial(); 
                 }
@@ -376,7 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- BOTONES FÍSICOS Y BUSCADOR (Sustituido Alert por Toast) ---
     const btnEmergenciaEntrada = document.getElementById('btn-emergencia-entrada');
     const btnEmergenciaSalida = document.getElementById('btn-emergencia-salida');
 
