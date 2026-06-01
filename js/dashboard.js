@@ -1,5 +1,6 @@
 // js/dashboard.js
-import { auth, firestoreDB, doc, getDoc, onAuthStateChanged, signOut } from './firebase-config.js';
+// Importamos también 'db', 'ref' y 'get' para que el dashboard pueda espiar a Firebase
+import { auth, firestoreDB, doc, getDoc, onAuthStateChanged, signOut, db, ref, get } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const nombreUsuario = document.getElementById('nombre-usuario');
@@ -7,48 +8,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSalir = document.getElementById('btn-salir');
     const tarjetaTicket = document.getElementById('tarjeta-ticket');
 
-    // 1. Escuchar el estado de seguridad de Firebase en tiempo real
+    // 1. Escuchar sesión
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-
             const docRef = doc(firestoreDB, "usuarios", user.uid);
             const docSnap = await getDoc(docRef);
-
             if (docSnap.exists()) {
                 const datosUsuario = docSnap.data();
-
-                // Ponemos su nombre real en la pantalla
                 nombreUsuario.textContent = datosUsuario.nombre;
                 if (placaUsuario) placaUsuario.textContent = datosUsuario.placa;
-                
-                // Guardamos esto en la memoria local para el Carrito
                 localStorage.setItem('nombreUsuario', datosUsuario.nombre);
                 localStorage.setItem('placaUsuario', datosUsuario.placa);
-                
-                // Guardamos su correo en local solo por si otros scripts viejos lo necesitan temporalmente
-                localStorage.setItem('usuarioLogueado', datosUsuario.correo);
             }
         } else {
-            // Si no hay sesión válida, lo regresamos al login por seguridad
             window.location.href = '../index.html';
         }
     });
 
-    // 2. Cerrar sesión de verdad en la nube
     btnSalir.addEventListener('click', () => {
         signOut(auth).then(() => {
             localStorage.removeItem('usuarioLogueado');
+            localStorage.removeItem('ticketActual');
             window.location.href = '../index.html';
         });
     });
 
-    // 3. Revisar si tiene un ticket activo (Esto se conectará a Firestore más adelante)
-    const ticketActual = localStorage.getItem('ticketActual');
-    if (!ticketActual) {
+    // 2. MAGIA ANTI-BUGS: Revisar si el ticket sigue vivo en la base de datos
+    const ticketLocalString = localStorage.getItem('ticketActual');
+    
+    if (!ticketLocalString) {
+        mostrarSinReservas();
+    } else {
+        const ticketLocal = JSON.parse(ticketLocalString);
+        
+        // Vamos a la Realtime Database a preguntar si el código todavía existe
+        get(ref(db, 'tickets_activos/' + ticketLocal.codigo)).then((snapshot) => {
+            if (!snapshot.exists()) {
+                // Si el Súper Admin o el Recolector de Basura lo eliminaron, lo borramos del celular
+                console.log("El ticket expiró o fue forzado. Limpiando caché...");
+                localStorage.removeItem('ticketActual');
+                mostrarSinReservas();
+            } else {
+                // Sigue vivo, le dejamos el botón activado
+                tarjetaTicket.classList.remove('deshabilitada');
+                tarjetaTicket.querySelector('.texto-secundario').textContent = "Ver Ticket";
+            }
+        });
+    }
+
+    function mostrarSinReservas() {
         tarjetaTicket.classList.add('deshabilitada');
         tarjetaTicket.querySelector('.texto-secundario').textContent = "Sin reservas";
-    } else {
-        tarjetaTicket.classList.remove('deshabilitada');
-        tarjetaTicket.querySelector('.texto-secundario').textContent = "Ver Ticket";
+        tarjetaTicket.removeAttribute('href'); // Desactiva el clic
     }
 });

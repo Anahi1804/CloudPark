@@ -6,6 +6,7 @@
     <title>Panel de Control - CloudPark</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-app text-main">
 
@@ -17,24 +18,25 @@
             </div>
             
             <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
-                <button id="btn-emergencia-entrada" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">
-                    Abrir Entrada
-                </button>
-                <button id="btn-emergencia-salida" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">
-                    Abrir Salida
-                </button>
-                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir del Panel</a>
+                <button id="btn-emergencia-entrada" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">Abrir Entrada</button>
+                <button id="btn-emergencia-salida" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">Abrir Salida</button>
+                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir</a>
             </div>
         </header>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-            <div class="stats-card">
-                <h3>Ingresos Totales</h3>
-                <div class="numero" id="stat-ingresos">$0.00</div>
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 2rem;">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="stats-card">
+                    <h3>Ingresos Totales</h3>
+                    <div class="numero" id="stat-ingresos">$0.00</div>
+                </div>
+                <div class="stats-card">
+                    <h3>Tickets Liquidados</h3>
+                    <div class="numero" id="stat-tickets" style="color: #FFFFFF;">0</div>
+                </div>
             </div>
-            <div class="stats-card">
-                <h3>Tickets Liquidados</h3>
-                <div class="numero" id="stat-tickets" style="color: #FFFFFF;">0</div>
+            <div class="stats-card" style="display: flex; align-items: center; justify-content: center; position: relative;">
+                <canvas id="graficaPaquetes" style="max-height: 200px; width: 100%;"></canvas>
             </div>
         </div>
 
@@ -51,28 +53,16 @@
             <section>
                 <h2>Inspección de Vehículo</h2>
                 <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left; min-height: 180px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-                    <p style="color: var(--text-muted); text-align: center; margin: 0;">
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px; opacity: 0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <br>
-                        Haz clic en un cajón ocupado<br>para espiar los datos y ver opciones de control.
-                    </p>
+                    <p style="color: var(--text-muted); text-align: center; margin: 0;">Haz clic en un cajón para ver datos.</p>
                 </div>
             </section>
 
             <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 2rem; border-top: 3px solid var(--spot-selected);">
-                <h3 class="titulo-seccion" style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    Centro de Resoluciones (Plan B)
-                </h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
-                    Busca un cliente activo por placa si se quedó sin batería o perdió su código.
-                </p>
-
+                <h3 class="titulo-seccion">Centro de Resoluciones (Plan B)</h3>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234)" style="flex: 1; min-width: 250px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; text-transform: uppercase;">
                     <button id="btn-buscar-admin" class="btn-neon" style="padding: 12px 24px; border-radius: 10px;">Buscar Cliente</button>
                 </div>
-
                 <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed var(--border-dark);"></div>
             </section>
         </div>
@@ -80,7 +70,10 @@
         <section style="margin-top: 3rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-dark); margin-bottom: 1rem; padding-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                 <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos</h2>
-                <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa o cliente..." style="padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; min-width: 250px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa..." style="padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; min-width: 200px;">
+                    <button id="btn-exportar-csv" style="background: #1e8e3e; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">📥 Exportar CSV</button>
+                </div>
             </div>
             
             <div style="width: 100%; overflow-x: auto; background: var(--surface-dark); border-radius: 12px; border: 1px solid var(--border-dark);">
@@ -96,14 +89,11 @@
                         </tr>
                     </thead>
                     <tbody id="tabla-body-historial">
-                        <tr>
-                            <td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando registros...</td>
-                        </tr>
+                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando registros...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
-
     </div>
 
     <script type="module" src="../js/admin.js"></script>

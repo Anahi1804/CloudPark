@@ -1,11 +1,36 @@
 // js/admin.js
-import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue, set, update, doc, setDoc } from './firebase-config.js';
+import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue, set, doc, setDoc } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Validar Sesión
     onAuthStateChanged(auth, (user) => {
         if (!user) window.location.href = '../index.html';
     });
+
+    // --- FUNCIÓN DE NOTIFICACIONES ELEGANTES (TOAST) ---
+    function showToast(mensaje, tipo = 'info') {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        
+        let icono = '';
+        if(tipo === 'success') icono = '✅';
+        if(tipo === 'error') icono = '❌';
+        if(tipo === 'info') icono = 'ℹ️';
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        toast.innerHTML = `<span>${icono}</span> <span>${mensaje}</span>`;
+        container.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
 
     const tablaBody = document.getElementById('tabla-body-historial');
     const statIngresos = document.getElementById('stat-ingresos');
@@ -13,10 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapaContainer = document.getElementById('admin-mapa-container');
     const infoVehiculo = document.getElementById('info-vehiculo');
     const filtroHistorial = document.getElementById('filtro-historial');
+    const btnExportar = document.getElementById('btn-exportar-csv');
 
-    // --- 2. FIRESTORE: Cargar Historial ---
-    let historialGlobal = []; // Para el buscador
+    let historialGlobal = []; 
+    let chartInstancia = null; // Variable para la gráfica
 
+    // --- CARGAR HISTORIAL, GRÁFICAS Y TABLA ---
     async function cargarHistorial() {
         try {
             const querySnapshot = await getDocs(collection(firestoreDB, "historial_tickets"));
@@ -24,15 +51,23 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalTickets = 0;
             historialGlobal = [];
 
+            // Contadores para la gráfica
+            let paquetesCount = { 'Express': 0, 'Estándar': 0, 'Reunión': 0, 'Máximo': 0 };
+
             querySnapshot.forEach((documento) => {
                 const ticket = documento.data(); 
-                ticket.idReal = documento.id; // Guardamos el ID
+                ticket.idReal = documento.id; 
                 historialGlobal.push(ticket);
 
                 const reserva = Number(ticket.pagoReserva) || 0;
                 const tiempo = Number(ticket.pagoEstacionamiento) || 0;
                 const multa = Number(ticket.pagoMulta) || 0;
                 const sumaTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
+
+                // Sumar para gráfica
+                if (ticket.paquete && paquetesCount[ticket.paquete] !== undefined) {
+                    paquetesCount[ticket.paquete]++;
+                }
 
                 totalTickets++;
                 totalDinero += sumaTotal; 
@@ -41,11 +76,37 @@ document.addEventListener('DOMContentLoaded', () => {
             statTickets.textContent = totalTickets;
             statIngresos.textContent = `$${totalDinero.toFixed(2)}`;
             renderizarTablaHistorial(historialGlobal);
+            dibujarGrafica(paquetesCount);
 
         } catch (error) {
             console.error("Error al cargar historial:", error);
-            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger-neon);">Error al cargar los datos.</td></tr>`;
         }
+    }
+
+    // Dibujar Gráfica Chart.js
+    function dibujarGrafica(conteo) {
+        const ctx = document.getElementById('graficaPaquetes').getContext('2d');
+        if (chartInstancia) chartInstancia.destroy(); // Borrar si ya existe
+
+        chartInstancia = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Express', 'Estándar', 'Reunión', 'Máximo'],
+                datasets: [{
+                    data: [conteo['Express'], conteo['Estándar'], conteo['Reunión'], conteo['Máximo']],
+                    backgroundColor: ['#0A84FF', '#32D74B', '#FFD60A', '#BF5AF2'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#8E8E93' } }
+                }
+            }
+        });
     }
 
     function renderizarTablaHistorial(datos) {
@@ -91,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarHistorial();
 
-    // Filtro dinámico del historial
+    // Filtro y Exportar
     if(filtroHistorial) {
         filtroHistorial.addEventListener('input', (e) => {
             const texto = e.target.value.toLowerCase();
@@ -103,10 +164,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 3. MATRIZ DE ESTADOS EN TIEMPO REAL ---
-    let adminEstadoFisico = {};
-    let adminTicketsActivos = {};
+    if (btnExportar) {
+        btnExportar.addEventListener('click', () => {
+            let csv = "ID_Ticket,Cliente,Placa,Cajon,Pago_Reserva,Pago_Tiempo,Pago_Multa,Total\n";
+            historialGlobal.forEach(t => {
+                const reserva = Number(t.pagoReserva) || 0;
+                const tiempo = Number(t.pagoEstacionamiento) || 0;
+                const multa = Number(t.pagoMulta) || 0;
+                const total = Number(t.granTotal) || (reserva+tiempo+multa);
+                csv += `${t.idReal},${t.nombre},${t.placa},${t.cajon},$${reserva},$${tiempo},$${multa},$${total}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Reporte_CloudPark.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Reporte Excel descargado con éxito", "success");
+        });
+    }
 
+    // --- RECOLECTOR DE BASURA AUTOMÁTICO (GARBAGE COLLECTOR) ---
+    let adminTicketsActivos = {};
+    let adminEstadoFisico = {};
+
+    setInterval(() => {
+        const ahora = new Date().getTime();
+        for (let id in adminTicketsActivos) {
+            let t = adminTicketsActivos[id];
+            // Si el cliente pagó la reserva pero NUNCA cruzó la pluma y su tiempo expiró
+            if (t.estado === 'reservado' && ahora > t.timestampExpiracion) {
+                console.log(`[SISTEMA] Borrando ticket expirado y no utilizado: ${id}`);
+                set(ref(db, `tickets_activos/${id}`), null);
+                set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
+                showToast(`Se liberó el cajón ${t.cajon} (El cliente nunca llegó)`, 'info');
+            }
+        }
+    }, 10000); // Revisa cada 10 segundos ininterrumpidamente
+
+
+    // --- MATRIZ DE ESTADOS EN TIEMPO REAL ---
     const ticketsActivosRef = ref(db, 'tickets_activos');
     const sensoresFisicosRef = ref(db, 'estacionamiento_actual');
 
@@ -117,13 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     onValue(sensoresFisicosRef, (snapshot) => {
         adminEstadoFisico = snapshot.val() || {};
-        
-        // 🧠 MAGIA DE SERVIDOR: El Admin vigila y arranca relojes
+        // Empatar sensor físico con reloj
         const equivalenciasInversas = {
             'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3',
             'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3'
         };
-
         for(let keySensor in adminEstadoFisico) {
             let estado = String(adminEstadoFisico[keySensor]).trim().toLowerCase();
             if(estado === 'ocupado') {
@@ -142,20 +239,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function dibujarMapaAdmin() {
-        const equivalencias = {
-            'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3',
-            'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6'
-        };
-
+        const equivalencias = { 'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3', 'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6' };
         let infoPorCajon = {};
         for (let id in adminTicketsActivos) {
             infoPorCajon[adminTicketsActivos[id].cajon] = { id: id, ...adminTicketsActivos[id] };
         }
-
         let htmlMapa = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">`;
-        const todosLosCajones = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'];
-
-        todosLosCajones.forEach(cajon => {
+        ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'].forEach(cajon => {
             const idSensor = equivalencias[cajon];
             const estadoSensor = adminEstadoFisico[idSensor]; 
             const ticketInfo = infoPorCajon[cajon];
@@ -178,11 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ticketInfo) {
                     if (ticketInfo.estado === 'multado') {
                         colorFondo = 'rgba(191, 90, 242, 0.1)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTA PENDIENTE';
-                    } 
-                    else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
+                    } else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
                         colorFondo = 'rgba(191, 90, 242, 0.1)'; colorBorde = '#BF5AF2'; colorTexto = '#BF5AF2'; etiqueta = 'EN TRÁNSITO'; brillo = 'inset 0 0 10px rgba(191, 90, 242, 0.3)';
-                    } 
-                    else if (ticketInfo.estado === 'reservado') {
+                    } else if (ticketInfo.estado === 'reservado') {
                         colorFondo = 'rgba(255, 214, 10, 0.1)'; colorBorde = '#FFD60A'; etiqueta = 'RESERVADO';
                     }
                 }
@@ -195,11 +283,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         });
-
         htmlMapa += `</div>`;
         mapaContainer.innerHTML = htmlMapa;
 
-        // Clics para Inspección Avanzada
         document.querySelectorAll('.cajon-admin').forEach(btn => {
             btn.addEventListener('click', () => {
                 const cajonSeleccionado = btn.getAttribute('data-cajon');
@@ -207,18 +293,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (datos) {
                     mostrarInfo(datos);
                 } else {
-                    const idSensor = equivalencias[cajonSeleccionado];
-                    if (adminEstadoFisico[idSensor] === 'ocupado') {
-                        infoVehiculo.innerHTML = `<div style="text-align:center; padding:1.5rem; color:#FF9500;"><h3>⚠️ Vehículo Obstructor</h3><p>Hay un auto físicamente en el cajón, pero no existe un ticket activo. Revise las cámaras.</p></div>`;
-                    } else {
-                        infoVehiculo.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted);"><p>Cajón vacío y sin reservas.</p></div>`;
-                    }
+                    infoVehiculo.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted);"><p>Cajón vacío y sin reservas.</p></div>`;
                 }
             });
         });
     }
 
-    // --- 4. ACCIONES MAESTRAS (SÚPER ADMIN) ---
     function mostrarInfo(datos) {
         let tiempoVivo = '<span style="color: var(--text-muted); font-size: 1.1rem;">Aún en tránsito</span>';
         if (datos.timestampIngresoFisico) {
@@ -226,20 +306,19 @@ document.addEventListener('DOMContentLoaded', () => {
             tiempoVivo = `<span style="color: #FFFFFF; font-weight: bold; font-size: 1.4rem;">${minutos} <small style="font-size: 0.9rem; color: var(--text-muted);">min</small></span>`;
         }
 
-        // Botones de acción dinámicos
         let botonesAccion = '';
         if (datos.estado === 'reservado') {
             botonesAccion = `<button id="btn-cancelar-reserva" data-id="${datos.id}" data-cajon="${datos.cajon}" style="width: 100%; padding: 10px; background: rgba(255, 69, 58, 0.2); border: 1px solid var(--danger-neon); color: var(--danger-neon); border-radius: 8px; cursor: pointer; font-weight: bold;">🚫 Cancelar Reserva</button>`;
         } else {
-            botonesAccion = `<button id="btn-forzar-salida" data-id="${datos.id}" data-cajon="${datos.cajon}" style="width: 100%; padding: 10px; background: rgba(255, 149, 0, 0.2); border: 1px solid #FF9500; color: #FF9500; border-radius: 8px; cursor: pointer; font-weight: bold;">🧹 Forzar Finalización (Sacar del sistema)</button>`;
+            botonesAccion = `<button id="btn-forzar-salida" data-id="${datos.id}" data-cajon="${datos.cajon}" style="width: 100%; padding: 10px; background: rgba(255, 149, 0, 0.2); border: 1px solid #FF9500; color: #FF9500; border-radius: 8px; cursor: pointer; font-weight: bold;">🧹 Forzar Finalización</button>`;
         }
 
         infoVehiculo.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 100%;">
                 <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Estado del Ticket</span><br>
-                        <strong style="color: ${datos.estado === 'multado' ? '#FF00FF' : 'var(--spot-selected)'}; font-size: 1.3rem; text-transform: uppercase;">${datos.estado}</strong>
+                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Estado</span><br>
+                        <strong style="color: var(--spot-selected); font-size: 1.3rem;">${datos.estado}</strong>
                     </div>
                     <div style="text-align: right;">
                         <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cajón</span><br>
@@ -253,26 +332,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Tiempo Estacionado</span><br>
+                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Tiempo</span><br>
                         ${tiempoVivo}
                     </div>
                 </div>
-                <div style="margin-top: 10px;">
-                    ${botonesAccion}
-                </div>
+                <div style="margin-top: 10px;">${botonesAccion}</div>
             </div>
         `;
 
-        // Lógica de los botones maestros
         const btnCancelar = document.getElementById('btn-cancelar-reserva');
         if (btnCancelar) {
             btnCancelar.addEventListener('click', (e) => {
-                if(confirm("¿Seguro que deseas cancelar esta reserva? El lugar quedará libre.")) {
+                if(confirm("¿Cancelar esta reserva? El lugar quedará libre.")) {
                     const idT = e.target.getAttribute('data-id');
                     const caj = e.target.getAttribute('data-cajon');
                     set(ref(db, `tickets_activos/${idT}`), null);
                     set(ref(db, `cajones_bloqueados/${caj}`), null);
-                    infoVehiculo.innerHTML = `<p style="color: var(--success-neon); text-align: center;">Reserva cancelada.</p>`;
+                    showToast("Reserva cancelada exitosamente.", "success");
+                    infoVehiculo.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Reserva cancelada.</p>`;
                 }
             });
         }
@@ -280,45 +357,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnForzar = document.getElementById('btn-forzar-salida');
         if (btnForzar) {
             btnForzar.addEventListener('click', async (e) => {
-                if(confirm("ATENCIÓN: Esto sacará al auto del sistema como si hubiera salido. ¿Continuar?")) {
+                if(confirm("ATENCIÓN: Esto sacará al auto del sistema. ¿Continuar?")) {
                     const idT = e.target.getAttribute('data-id');
                     const caj = e.target.getAttribute('data-cajon');
-                    
-                    // Copiar al historial de Firestore
                     const ticketAForzar = adminTicketsActivos[idT];
                     ticketAForzar.estadoFinal = "completado_forzoso";
                     ticketAForzar.timestampSalida = new Date().getTime();
                     
                     await setDoc(doc(firestoreDB, "historial_tickets", idT), ticketAForzar);
-                    
-                    // Borrar de Realtime
                     set(ref(db, `tickets_activos/${idT}`), null);
                     set(ref(db, `cajones_bloqueados/${caj}`), null);
                     
-                    infoVehiculo.innerHTML = `<p style="color: var(--success-neon); text-align: center;">Ticket finalizado y cajón liberado.</p>`;
-                    cargarHistorial(); // Refrescamos la tabla de abajo
+                    showToast("Vehículo removido del sistema forzosamente.", "success");
+                    infoVehiculo.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Ticket finalizado y cajón liberado.</p>`;
+                    cargarHistorial(); 
                 }
             });
         }
     }
 
-    // --- 5. BOTONES DE EMERGENCIA FÍSICOS ---
+    // --- BOTONES FÍSICOS Y BUSCADOR (Sustituido Alert por Toast) ---
     const btnEmergenciaEntrada = document.getElementById('btn-emergencia-entrada');
     const btnEmergenciaSalida = document.getElementById('btn-emergencia-salida');
 
     if(btnEmergenciaEntrada) {
         btnEmergenciaEntrada.addEventListener('click', () => {
-            if(confirm("🚨 ¿Estás seguro de forzar la apertura de la pluma de ENTRADA?")) set(ref(db, 'control_plumas/entrada'), 'abrir');
+            set(ref(db, 'control_plumas/entrada'), 'abrir');
+            showToast("Señal enviada: Abriendo pluma de Entrada", "info");
         });
     }
 
     if(btnEmergenciaSalida) {
         btnEmergenciaSalida.addEventListener('click', () => {
-            if(confirm("🚨 ¿Estás seguro de forzar la apertura de la pluma de SALIDA?")) set(ref(db, 'control_plumas/salida'), 'abrir');
+            set(ref(db, 'control_plumas/salida'), 'abrir');
+            showToast("Señal enviada: Abriendo pluma de Salida", "info");
         });
     }
 
-    // --- 6. BUSCADOR INTELIGENTE (Mantenido intacto) ---
     const inputBusqueda = document.getElementById('input-busqueda-admin');
     const btnBuscar = document.getElementById('btn-buscar-admin');
     const divResultado = document.getElementById('resultado-busqueda');
@@ -330,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         btnBuscar.addEventListener('click', () => {
             const query = inputBusqueda.value.trim().toUpperCase();
-            if (!query) { alert("Por favor ingresa una placa o código."); return; }
+            if (!query) { showToast("Por favor ingresa una placa o código.", "error"); return; }
 
             btnBuscar.textContent = "Buscando...";
             divResultado.classList.add('oculto');
@@ -352,11 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 divResultado.classList.remove('oculto');
 
                 if (!ticketEncontrado) {
-                    divResultado.innerHTML = `
-                        <div style="text-align: center; padding: 10px;">
-                            <p style="color: var(--danger-neon); margin: 0; font-weight: bold; font-size: 1.1rem;">❌ Vehículo no encontrado</p>
-                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">Asegúrate de que la placa (${query}) tenga un boleto activo.</p>
-                        </div>`;
+                    divResultado.innerHTML = `<div style="text-align: center; padding: 10px;"><p style="color: var(--danger-neon); margin: 0; font-weight: bold; font-size: 1.1rem;">❌ Vehículo no encontrado</p></div>`;
                     return;
                 }
 
@@ -366,63 +437,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (ticketEncontrado.estado === 'multado') {
                     colorEstado = "#FF00FF";
-                    mensajeDeuda = `DEBE MULTA: $${ticketEncontrado.pagoMulta} MXN`;
-                    accionHTML = `
-                        <button class="btn-resolver-plan-b" data-id="${idTicketEncontrado}" style="background: #FF00FF; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1rem;">
-                            💵 Cobrar Multa en Efectivo y Abrir Salida
-                        </button>`;
+                    mensajeDeuda = `DEBE MULTA: $${ticketEncontrado.pagoMulta}`;
+                    accionHTML = `<button class="btn-resolver-plan-b" data-id="${idTicketEncontrado}" style="background: #FF00FF; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">💵 Cobrar Efectivo y Abrir</button>`;
                 } else if (ticketEncontrado.estado === 'en_uso' || ticketEncontrado.estado === 'reservado') {
                     colorEstado = "#FFD60A";
-                    mensajeDeuda = "Ticket en curso (Aún no cobra salida)";
-                    accionHTML = `
-                        <button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: transparent; border: 2px solid var(--spot-selected); color: var(--spot-selected); padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1rem;">
-                            🚨 Forzar Apertura de Salida
-                        </button>`;
+                    mensajeDeuda = "Ticket en curso";
+                    accionHTML = `<button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: transparent; border: 2px solid var(--spot-selected); color: var(--spot-selected); padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">🚨 Forzar Apertura</button>`;
                 } else if (ticketEncontrado.estado === 'pagado') {
-                    accionHTML = `
-                        <button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: var(--success-neon); color: black; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1rem;">
-                            ✅ Ya pagó. Abrir Pluma de Salida
-                        </button>`;
+                    accionHTML = `<button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: var(--success-neon); color: black; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">✅ Ya pagó. Abrir Pluma</button>`;
                 }
 
                 divResultado.innerHTML = `
                     <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;">
                         <div>
-                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem; letter-spacing: 1px;">CLIENTE</p>
+                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">CLIENTE</p>
                             <strong style="color: white; font-size: 1.2rem;">${ticketEncontrado.nombre}</strong><br>
-                            <span style="color: var(--spot-selected); font-family: monospace; font-size: 0.9rem;">${idTicketEncontrado}</span> | Placa: <strong style="color: white;">${ticketEncontrado.placa}</strong>
+                            <span style="color: var(--spot-selected); font-family: monospace;">${idTicketEncontrado}</span> | Placa: <strong>${ticketEncontrado.placa}</strong>
                         </div>
                         <div style="text-align: right;">
-                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem; letter-spacing: 1px;">ESTADO FINANCIERO</p>
+                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">ESTADO</p>
                             <strong style="color: ${colorEstado}; font-size: 1.1rem;">${mensajeDeuda}</strong><br>
-                            <span style="color: white; font-size: 0.9rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;">Cajón: ${ticketEncontrado.cajon}</span>
+                            <span style="color: white; font-size: 0.9rem;">Cajón: ${ticketEncontrado.cajon}</span>
                         </div>
                     </div>
-                    ${accionHTML}
+                    <div style="margin-top: 15px;">${accionHTML}</div>
                 `;
 
                 const btnResolver = divResultado.querySelector('.btn-resolver-plan-b');
                 if (btnResolver) {
                     btnResolver.addEventListener('click', () => {
-                        if(confirm("¿Confirmas el pago en efectivo y abrir la pluma?")) {
-                            set(ref(db, `tickets_activos/${idTicketEncontrado}/estado`), 'pagado');
-                            set(ref(db, 'control_plumas/salida'), 'abrir');
-                            alert("✅ Pago registrado. Pluma abriéndose...");
-                            divResultado.innerHTML = `<p style="color: var(--success-neon); text-align: center; font-weight: bold; margin-top: 10px;">Pluma abierta y pago resuelto.</p>`;
-                        }
+                        set(ref(db, `tickets_activos/${idTicketEncontrado}/estado`), 'pagado');
+                        set(ref(db, 'control_plumas/salida'), 'abrir');
+                        showToast("Pago registrado. Abriendo pluma...", "success");
+                        divResultado.innerHTML = `<p style="color: var(--success-neon); text-align: center; font-weight: bold;">Pluma abierta y pago resuelto.</p>`;
                     });
                 }
 
                 const btnAbrir = divResultado.querySelector('.btn-abrir-plan-b');
                 if (btnAbrir) {
                     btnAbrir.addEventListener('click', () => {
-                        if(confirm("¿Confirmas forzar la apertura de la pluma de SALIDA?")) {
-                            set(ref(db, 'control_plumas/salida'), 'abrir');
-                            alert("✅ Pluma abriéndose...");
-                        }
+                        set(ref(db, 'control_plumas/salida'), 'abrir');
+                        showToast("Señal enviada: Abriendo pluma", "info");
                     });
                 }
-
             }, 600); 
         });
     }
