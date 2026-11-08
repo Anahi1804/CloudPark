@@ -493,3 +493,11 @@ h2 {
         grid-template-columns: 1fr;
     }
 }
+
+/* Filtro Dark Mode para OpenStreetMap (100% gratis y sin API Key) */
+.leaflet-container {
+    background: #09090b !important;
+}
+.leaflet-tile-pane {
+    filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%);
+}
