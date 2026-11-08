@@ -1,8 +1,7 @@
-// js/salida.js
-import { db, ref, get, set, firestoreDB, doc, setDoc, update} from './firebase-config.js';
+// js/salida.js - Respeta si el Administrador activó o desactivó el cobro de multas
+import { db, ref, get, set, firestoreDB, doc, setDoc, update, PARKIL_CONFIG } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-
     const inputCodigo = document.getElementById('codigo-salida');
     const btnValidar = document.getElementById('btn-validar-salida');
     const pantallaEstado = document.getElementById('pantalla-hardware');
@@ -16,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (codigoIngresado === '') { inputCodigo.focus(); return; }
 
         bloquearInterfaz("Verificando pago...");
-
         const ticketRef = ref(db, 'tickets_activos/' + codigoIngresado);
 
         get(ticketRef).then((snapshot) => {
@@ -27,57 +25,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ticket = snapshot.val();
 
-
             if (ticket.estado !== "pagado") {
                 mostrarError("Aún no has liquidado tu estancia. Por favor paga desde tu app móvil.");
                 return;
             }
 
+            const ahora = Date.now();
+            const toleranciaMs = PARKIL_CONFIG.MODO_DEMO
+                ? PARKIL_CONFIG.TOLERANCIA_SALIDA_MS
+                : (Number(ticket.toleranciaMinutos || 15) * 60000);
 
-            const ahora = new Date().getTime();
-            // 15 minutos reales son 900,000 ms. 
-            // Para probarlo lo pondremos en 30 segundos (30000 ms).
-            const limiteTolerancia = 30000; 
+            // Solo aplicamos multa si el Administrador de esta sucursal activó "cobrarMulta"
+            const aplicaMulta = ticket.cobrarMulta !== false;
 
-            if (ticket.timestampPagado && (ahora - ticket.timestampPagado) > limiteTolerancia) {
-                mostrarError("⏳ Tiempo de salida excedido. Se aplicará multa.");
-                
-                // Solo actualizamos el estado, dejamos intacto el timestampPagado
-                update(ticketRef, {
-                    estado: "multado" 
-                });
-                
+            if (aplicaMulta && ticket.timestampPagado && (ahora - ticket.timestampPagado) > toleranciaMs) {
+                mostrarError(`⚠️ Tiempo de salida excedido. Se aplicará recargo de $${Number(ticket.precioMulta || 25).toFixed(2)}.`);
+                update(ticketRef, { estado: "multado" });
                 setTimeout(() => {
                     pantallaEstado.classList.add('oculto');
                     reactivarInterfaz();
-                }, 5000);
-                return; 
+                }, 4500);
+                return;
             }
-            // El cliente ya pagó. Procedemos con la Mudanza de Datos.
-            textoEstado.textContent = "Archivando ticket...";
 
-            // 1. Preparamos el documento para Firestore (Historial Histórico)
+            textoEstado.textContent = "Archivando ticket...";
             const historialRef = doc(firestoreDB, "historial_tickets", codigoIngresado);
             const datosHistorial = {
-                ...ticket, // Copiamos toda la info del ticket original
+                ...ticket,
                 fechaSalidaFisica: new Date().toLocaleString(),
-                timestampSalida: new Date().getTime(),
+                timestampSalida: ahora,
                 estadoFinal: "completado"
             };
 
-            // 2. Guardamos en Firestore
-// 3. Borramos de la Realtime Database para liberar el cajón (Recolección de Basura)
-            setDoc(historialRef, datosHistorial).then(() => {              
+            setDoc(historialRef, datosHistorial).then(() => {
                 return set(ticketRef, null);
             }).then(() => {
-                //  Quitamos el candado de concurrencia
                 return set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
             }).then(() => {
-
-                // Mandamos la orden al motor de SALIDA!
                 set(ref(db, 'control_plumas/salida'), 'abrir');
-                
-                // 4. Mostramos éxito en la pantalla y abrimos pluma
                 mostrarExito("¡Buen viaje! Abriendo pluma...");
                 detalleCobro.classList.remove('oculto');
                 detalleCobro.innerHTML = `
@@ -89,27 +74,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         Pago Confirmado en Nube
                     </div>
                 `;
-
-                // Quitar el ticket del celular también (limpiar localstorage)
                 localStorage.removeItem('ticketActual');
-
                 setTimeout(() => {
                     pantallaEstado.classList.add('oculto');
                     reactivarInterfaz();
                 }, 4000);
-
             }).catch(error => {
                 console.error("Error en la mudanza de datos:", error);
                 mostrarError("Error al archivar. Contacte administración.");
             });
-
-        }).catch((error) => {
-            console.error("Error de conexión:", error);
+        }).catch(() => {
             mostrarError("Error de conexión. Intenta de nuevo.");
         });
     });
 
-    // --- Funciones UI auxiliares ---
     function bloquearInterfaz(mensaje) {
         inputCodigo.disabled = true;
         btnValidar.disabled = true;

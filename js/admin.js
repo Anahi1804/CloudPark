@@ -1,4 +1,4 @@
-// js/admin.js - Suite Administrativa, Mapa Libre de API Key y Constructor 2D con Carga Instantánea
+// js/admin.js - Gestión Multi-Sucursal por Propietario, Configuración de Cobros y Constructor 2D
 import {
     auth, firestoreDB, db, PARKIL_CONFIG, obtenerLogoParkilSVG,
     onAuthStateChanged, signOut, collection, getDocs,
@@ -6,20 +6,11 @@ import {
 } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Insertar el nuevo logo en el header
     const logoContainer = document.getElementById('logo-header-admin');
     if (logoContainer) logoContainer.innerHTML = obtenerLogoParkilSVG(48);
 
-    onAuthStateChanged(auth, (user) => {
-        if (!user) window.location.href = '../index.html';
-    });
-
-    const btnCerrarSesion = document.getElementById('btn-cerrar-sesion-admin');
-    if (btnCerrarSesion) {
-        btnCerrarSesion.addEventListener('click', () => {
-            signOut(auth).then(() => window.location.href = '../index.html');
-        });
-    }
+    let adminActualUID = localStorage.getItem('adminUID') || 'admin_principal';
+    let adminActualEmail = localStorage.getItem('usuarioLogueado') || 'admin@parkil.mx';
 
     // --- NOTIFICACIONES TOAST ---
     function showToast(mensaje, tipo = 'info') {
@@ -42,16 +33,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3800);
     }
 
-    // --- PLANTILLAS INICIALES (Maqueta 2 Pisos + Sucursal Galerías) ---
-    function crearEstacionamientoPorDefecto() {
+    // --- PAQUETES DE RESERVA POR DEFECTO ---
+    function obtenerPaquetesDefault() {
+        return [
+            { id: 'paq_1', nombre: '⚡ Express (30 min)', minutos: 30, precio: 15.00, activo: true },
+            { id: 'paq_2', nombre: '🚗 Estándar (1 hora)', minutos: 60, precio: 25.00, activo: true },
+            { id: 'paq_3', nombre: '💼 Reunión (2 horas)', minutos: 120, precio: 45.00, activo: true },
+            { id: 'paq_4', nombre: '🌟 Máximo (4 horas)', minutos: 240, precio: 80.00, activo: true }
+        ];
+    }
+
+    // --- PLANTILLA BASE CON SENSORES DE MAQUETA ---
+    function crearEstacionamientoPorDefecto(ownerUid = adminActualUID) {
         return {
             id: PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID,
+            ownerUid: ownerUid,
             nombre: "Parkil Matriz Centro Histórico (Maqueta IoT)",
             direccion: "Calle 10 #245, Centro Histórico, San Francisco de Campeche",
             tarifaHora: 25,
             niveles: 2,
             lat: 19.845400,
             lng: -90.535800,
+            configCobros: {
+                cobrarReserva: true,
+                cobrarMulta: true,
+                precioMulta: 25.00,
+                toleranciaMinutos: 15,
+                paquetes: obtenerPaquetesDefault()
+            },
             pisos: {
                 "1": {
                     columnas: 5,
@@ -115,44 +124,127 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function obtenerCatalogoInicial() {
+    // Sucursales simuladas de otros dueños en Campeche (Solo las ve el Conductor en su mapa, NO estorban al Admin)
+    function asegurarSucursalesSimuladasRed(catalogo) {
+        if (!catalogo["sim_malecon_campeche"]) {
+            const base = crearEstacionamientoPorDefecto(" OTRO_ADMIN_SIMULADO ");
+            catalogo["sim_malecon_campeche"] = {
+                ...base,
+                id: "sim_malecon_campeche",
+                ownerUid: "RED_SIMULADA_EXTERNA",
+                nombre: "Estacionamiento Malecón Justo Sierra",
+                direccion: "Av. Ruiz Cortines, Área Ah-Kim-Pech, Campeche",
+                tarifaHora: 20,
+                niveles: 1,
+                lat: 19.849200,
+                lng: -90.537100,
+                configCobros: {
+                    cobrarReserva: false, // Ejemplo de estacionamiento que NO cobra reserva
+                    cobrarMulta: false,
+                    precioMulta: 0,
+                    toleranciaMinutos: 20,
+                    paquetes: obtenerPaquetesDefault()
+                }
+            };
+            Object.values(catalogo["sim_malecon_campeche"].pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
+        }
+        if (!catalogo["sim_galerias_campeche"]) {
+            const base2 = crearEstacionamientoPorDefecto(" OTRO_ADMIN_SIMULADO ");
+            catalogo["sim_galerias_campeche"] = {
+                ...base2,
+                id: "sim_galerias_campeche",
+                ownerUid: "RED_SIMULADA_EXTERNA",
+                nombre: "Parkil Plaza Galerías Campeche",
+                direccion: "Av. Pedro Sainz de Baranda #139, Campeche",
+                tarifaHora: 30,
+                niveles: 2,
+                lat: 19.852800,
+                lng: -90.529500,
+                configCobros: {
+                    cobrarReserva: true,
+                    cobrarMulta: true,
+                    precioMulta: 35.00,
+                    toleranciaMinutos: 15,
+                    paquetes: obtenerPaquetesDefault()
+                }
+            };
+            Object.values(catalogo["sim_galerias_campeche"].pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
+        }
+        return catalogo;
+    }
+
+    function cargarCatalogoGlobal() {
+        let cat = {};
         try {
             const guardado = localStorage.getItem('parkil_catalogo_sedes');
-            if (guardado) {
-                const parsed = JSON.parse(guardado);
-                if (parsed && Object.keys(parsed).length > 0) return parsed;
-            }
-        } catch (e) {
-            console.warn("Cargando catálogo por defecto...");
-        }
+            if (guardado) cat = JSON.parse(guardado) || {};
+        } catch (e) { cat = {}; }
 
-        const sede1 = crearEstacionamientoPorDefecto();
-        const sede2 = {
-            id: "parkil_galerias_campeche",
-            nombre: "Parkil Plaza Galerías Ah-Kim-Pech",
-            direccion: "Av. Pedro Sainz de Baranda, Ah-Kim-Pech, Campeche",
-            tarifaHora: 30,
-            niveles: 2,
-            lat: 19.852800,
-            lng: -90.529500,
-            pisos: JSON.parse(JSON.stringify(sede1.pisos))
-        };
-        Object.values(sede2.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
-
-        const inicial = {
-            [sede1.id]: sede1,
-            [sede2.id]: sede2
-        };
-        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(inicial));
-        return inicial;
+        cat = asegurarSucursalesSimuladasRed(cat);
+        return cat;
     }
 
-    // --- ESTADO GLOBAL INICIALIZADO AL INSTANTE ---
-    let catalogoEstacionamientos = obtenerCatalogoInicial();
+    let catalogoGlobal = cargarCatalogoGlobal();
     let estacionamientoActivoId = localStorage.getItem('adminEstacionamientoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
-    if (!catalogoEstacionamientos[estacionamientoActivoId]) {
-        estacionamientoActivoId = Object.keys(catalogoEstacionamientos)[0];
+
+    // Filtrar SOLO los estacionamientos que pertenecen al Admin logueado
+    function obtenerMisEstacionamientos() {
+        const misSedes = {};
+        Object.values(catalogoGlobal).forEach(sede => {
+            if (sede.ownerUid === adminActualUID || (!sede.ownerUid && sede.id === PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID)) {
+                sede.ownerUid = adminActualUID;
+                if (!sede.configCobros) {
+                    sede.configCobros = {
+                        cobrarReserva: true,
+                        cobrarMulta: true,
+                        precioMulta: sede.tarifaHora || 25,
+                        toleranciaMinutos: 15,
+                        paquetes: obtenerPaquetesDefault()
+                    };
+                }
+                misSedes[sede.id] = sede;
+            }
+        });
+
+        // Si este Admin aún no tiene ninguna sucursal, le asignamos su primera sucursal
+        if (Object.keys(misSedes).length === 0) {
+            const idInicial = !catalogoGlobal[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID]
+                ? PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID
+                : `parkil_sede_${adminActualUID.slice(0, 5)}`;
+            const nueva = crearEstacionamientoPorDefecto(adminActualUID);
+            nueva.id = idInicial;
+            catalogoGlobal[idInicial] = nueva;
+            misSedes[idInicial] = nueva;
+            guardarCatalogoEnNubeYLocal();
+        }
+        return misSedes;
     }
+
+    function guardarCatalogoEnNubeYLocal() {
+        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoGlobal));
+        set(ref(db, 'estacionamientos_red'), catalogoGlobal).catch(() => {});
+    }
+
+    // Autenticación y carga del Admin propietario
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            window.location.href = '../index.html';
+            return;
+        }
+        adminActualUID = user.uid;
+        adminActualEmail = user.email;
+        localStorage.setItem('adminUID', user.uid);
+
+        const misSedes = obtenerMisEstacionamientos();
+        if (!misSedes[estacionamientoActivoId]) {
+            estacionamientoActivoId = Object.keys(misSedes)[0];
+        }
+        refrescarTodaLaVistaAdmin();
+    });
+
+    document.getElementById('btn-cerrar-sesion-admin')?.addEventListener('click', () => {
+        signOut(auth).then(() => window.location.href = '../index.html');
+    });
 
     let pisoMonitorActual = 1;
     let pisoBuilderActual = 1;
@@ -167,14 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let mapaLeaflet = null;
     let marcadorLeaflet = null;
 
-    function guardarCatalogoEnNubeYLocal() {
-        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoEstacionamientos));
-        set(ref(db, 'estacionamientos_red'), catalogoEstacionamientos).catch(() => {
-            console.log("Guardado localmente (modo sin permisos de escritura en rama nueva de RTDB).");
-        });
+    function refrescarTodaLaVistaAdmin() {
+        actualizarSelectorSedes();
+        cargarFormularioSedeActiva();
+        renderizarPillsMonitor();
+        dibujarMapaAdmin();
+        renderizarConstructor();
+        cargarHistorial();
     }
 
-    // --- NAVEGACIÓN DE PESTAÑAS (TABS) ---
+    // --- NAVEGACIÓN DE PESTAÑAS ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
@@ -193,22 +287,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- SELECTOR DE SEDES ---
+    // --- SELECTOR DE MIS SUCURSALES ---
     const selectorSede = document.getElementById('selector-estacionamiento-activo');
     function actualizarSelectorSedes() {
         if (!selectorSede) return;
+        const misSedes = obtenerMisEstacionamientos();
+        if (!misSedes[estacionamientoActivoId]) {
+            estacionamientoActivoId = Object.keys(misSedes)[0];
+        }
+
         selectorSede.innerHTML = '';
-        Object.values(catalogoEstacionamientos).forEach(est => {
+        Object.values(misSedes).forEach(est => {
             const opt = document.createElement('option');
             opt.value = est.id;
             opt.textContent = `🏢 ${est.nombre}`;
             if (est.id === estacionamientoActivoId) opt.selected = true;
             selectorSede.appendChild(opt);
         });
-        const actual = catalogoEstacionamientos[estacionamientoActivoId];
+
+        const actual = misSedes[estacionamientoActivoId];
         if (actual) {
+            const txtRes = actual.configCobros?.cobrarReserva ? 'Reserva Pagada' : 'Reserva Gratis';
+            const txtMul = actual.configCobros?.cobrarMulta ? `Multa $${actual.configCobros.precioMulta}` : 'Sin Multas';
             document.getElementById('subtitulo-sede').textContent =
-                `${actual.nombre} • $${actual.tarifaHora}/hr • ${actual.niveles} Nivel(es)`;
+                `${actual.nombre} • $${actual.tarifaHora}/hr • ${txtRes} • ${txtMul}`;
         }
     }
 
@@ -217,19 +319,238 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('adminEstacionamientoId', estacionamientoActivoId);
         pisoMonitorActual = 1;
         pisoBuilderActual = 1;
-        actualizarSelectorSedes();
-        cargarFormularioSedeActiva();
-        renderizarPillsMonitor();
-        dibujarMapaAdmin();
-        renderizarConstructor();
+        refrescarTodaLaVistaAdmin();
         if (mapaLeaflet) inicializarMapaLeaflet();
-        showToast("Cambiaste de estacionamiento activo", "info");
+        showToast("Sucursal activa cambiada", "info");
+    });
+
+    // --- PESTAÑA 2: FORMULARIO DE SUCURSAL, CONFIGURACIÓN DE COBROS, MAPA Y ELIMINACIÓN ---
+    const chkCobrarReserva = document.getElementById('chk-cobrar-reserva');
+    const chkCobrarMulta = document.getElementById('chk-cobrar-multa');
+    const contenedorPaquetesUI = document.getElementById('lista-paquetes-admin');
+    const wrapperPrecioMulta = document.getElementById('wrapper-precio-multa');
+
+    chkCobrarReserva.addEventListener('change', () => {
+        contenedorPaquetesUI.style.opacity = chkCobrarReserva.checked ? '1' : '0.6';
+    });
+
+    chkCobrarMulta.addEventListener('change', () => {
+        wrapperPrecioMulta.style.opacity = chkCobrarMulta.checked ? '1' : '0.4';
+    });
+
+    function renderizarPaquetesEditor(paquetes) {
+        contenedorPaquetesUI.innerHTML = '';
+        paquetes.forEach((paq, idx) => {
+            const row = document.createElement('div');
+            row.className = 'paquete-config-row';
+            row.innerHTML = `
+                <input type="checkbox" class="paq-activo" data-idx="${idx}" ${paq.activo ? 'checked' : ''} style="width:18px; height:18px; accent-color:#32D74B; cursor:pointer;">
+                <input type="text" class="input-dark paq-nombre" data-idx="${idx}" value="${paq.nombre}" style="padding:7px 10px; font-size:0.82rem;">
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <input type="number" class="input-dark paq-min" data-idx="${idx}" value="${paq.minutos}" min="5" style="padding:7px 8px; font-size:0.82rem;">
+                    <small style="color:var(--text-muted); font-size:0.72rem;">min</small>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="color:#32D74B; font-weight:bold;">$</span>
+                    <input type="number" class="input-dark paq-precio" data-idx="${idx}" value="${paq.precio}" min="0" step="1" style="padding:7px 8px; font-size:0.82rem;">
+                </div>
+            `;
+            contenedorPaquetesUI.appendChild(row);
+        });
+    }
+
+    function cargarFormularioSedeActiva() {
+        const sede = catalogoGlobal[estacionamientoActivoId];
+        if (!sede) return;
+
+        document.getElementById('est-nombre').value = sede.nombre || '';
+        document.getElementById('est-direccion').value = sede.direccion || '';
+        document.getElementById('est-tarifa').value = sede.tarifaHora ?? 25;
+        document.getElementById('est-niveles').value = String(sede.niveles || 2);
+        document.getElementById('est-lat').value = Number(sede.lat || 19.8454).toFixed(6);
+        document.getElementById('est-lng').value = Number(sede.lng || -90.5358).toFixed(6);
+
+        const cfg = sede.configCobros || {
+            cobrarReserva: true,
+            cobrarMulta: true,
+            precioMulta: 25,
+            toleranciaMinutos: 15,
+            paquetes: obtenerPaquetesDefault()
+        };
+
+        chkCobrarReserva.checked = cfg.cobrarReserva !== false;
+        chkCobrarMulta.checked = cfg.cobrarMulta !== false;
+        document.getElementById('est-precio-multa').value = cfg.precioMulta ?? 25;
+        document.getElementById('est-tolerancia-min').value = cfg.toleranciaMinutos ?? 15;
+
+        renderizarPaquetesEditor(cfg.paquetes || obtenerPaquetesDefault());
+        contenedorPaquetesUI.style.opacity = chkCobrarReserva.checked ? '1' : '0.6';
+        wrapperPrecioMulta.style.opacity = chkCobrarMulta.checked ? '1' : '0.4';
+    }
+
+    function inicializarMapaLeaflet() {
+        const sede = catalogoGlobal[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
+        const lat = Number(sede.lat) || 19.8454;
+        const lng = Number(sede.lng) || -90.5358;
+
+        async function obtenerDireccionDesdeCoordenadas(latitud, longitud) {
+            document.getElementById('est-lat').value = latitud.toFixed(6);
+            document.getElementById('est-lng').value = longitud.toFixed(6);
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitud}&lon=${longitud}`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    const partes = data.display_name.split(',').slice(0, 4).join(', ');
+                    document.getElementById('est-direccion').value = partes;
+                }
+            } catch (err) {
+                console.warn("Autocompletado de dirección no disponible:", err);
+            }
+        }
+
+        if (!mapaLeaflet) {
+            mapaLeaflet = L.map('mapa-admin-leaflet').setView([lat, lng], 15);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(mapaLeaflet);
+
+            marcadorLeaflet = L.marker([lat, lng], { draggable: true }).addTo(mapaLeaflet);
+
+            mapaLeaflet.on('click', (e) => {
+                marcadorLeaflet.setLatLng([e.latlng.lat, e.latlng.lng]);
+                obtenerDireccionDesdeCoordenadas(e.latlng.lat, e.latlng.lng);
+            });
+
+            marcadorLeaflet.on('dragend', () => {
+                const pos = marcadorLeaflet.getLatLng();
+                obtenerDireccionDesdeCoordenadas(pos.lat, pos.lng);
+            });
+        } else {
+            mapaLeaflet.invalidateSize();
+            mapaLeaflet.setView([lat, lng], 15);
+            marcadorLeaflet.setLatLng([lat, lng]);
+        }
+    }
+
+    // Crear Nueva Sucursal propia
+    document.getElementById('btn-nuevo-estacionamiento').addEventListener('click', () => {
+        const nuevoId = 'parkil_sede_' + Date.now().toString().slice(-5);
+        const nuevaSede = crearEstacionamientoPorDefecto(adminActualUID);
+        nuevaSede.id = nuevoId;
+        nuevaSede.ownerUid = adminActualUID;
+        nuevaSede.nombre = "Nueva Sucursal Parkil";
+        nuevaSede.direccion = "San Francisco de Campeche";
+        nuevaSede.lat = 19.847500;
+        nuevaSede.lng = -90.533500;
+        Object.values(nuevaSede.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
+
+        catalogoGlobal[nuevoId] = nuevaSede;
+        estacionamientoActivoId = nuevoId;
+        localStorage.setItem('adminEstacionamientoId', nuevoId);
+        guardarCatalogoEnNubeYLocal();
+
+        refrescarTodaLaVistaAdmin();
+        if (mapaLeaflet) inicializarMapaLeaflet();
+        showToast("Nueva sucursal creada. Configura sus cobros y ubicación.", "info");
+    });
+
+    // Eliminar Sucursal propia
+    document.getElementById('btn-eliminar-estacionamiento').addEventListener('click', async () => {
+        const misSedes = obtenerMisEstacionamientos();
+        const sedeActual = misSedes[estacionamientoActivoId];
+        if (!sedeActual) return;
+
+        if (Object.keys(misSedes).length <= 1) {
+            alert("⚠️ Debes conservar al menos una sucursal activa en tu cuenta de Administrador. Si deseas otra, primero crea una nueva sucursal y luego elimina esta.");
+            return;
+        }
+
+        if (!confirm(`¿Seguro que deseas eliminar permanentemente la sucursal "${sedeActual.nombre}"?`)) {
+            return;
+        }
+
+        const idBorrar = estacionamientoActivoId;
+        delete catalogoGlobal[idBorrar];
+        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoGlobal));
+        await set(ref(db, `estacionamientos_red/${idBorrar}`), null).catch(() => {});
+
+        const restantes = obtenerMisEstacionamientos();
+        estacionamientoActivoId = Object.keys(restantes)[0];
+        localStorage.setItem('adminEstacionamientoId', estacionamientoActivoId);
+
+        refrescarTodaLaVistaAdmin();
+        if (mapaLeaflet) inicializarMapaLeaflet();
+        showToast("Sucursal eliminada correctamente", "success");
+    });
+
+    // Guardar Formulario de Datos, Cobros, Paquetes y Mapa
+    document.getElementById('form-alta-estacionamiento').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const sede = catalogoGlobal[estacionamientoActivoId];
+        if (!sede) return;
+
+        // Recolectar paquetes configurados
+        const paquetesActualizados = [];
+        const checks = contenedorPaquetesUI.querySelectorAll('.paq-activo');
+        const nombres = contenedorPaquetesUI.querySelectorAll('.paq-nombre');
+        const mins = contenedorPaquetesUI.querySelectorAll('.paq-min');
+        const precios = contenedorPaquetesUI.querySelectorAll('.paq-precio');
+
+        for (let i = 0; i < checks.length; i++) {
+            paquetesActualizados.push({
+                id: `paq_${i + 1}`,
+                activo: checks[i].checked,
+                nombre: nombres[i].value.trim() || `Paquete ${i + 1}`,
+                minutos: Math.max(5, Number(mins[i].value) || 30),
+                precio: Math.max(0, Number(precios[i].value) || 0)
+            });
+        }
+
+        if (!paquetesActualizados.some(p => p.activo)) {
+            paquetesActualizados[0].activo = true; // Garantizar al menos 1 opción de tiempo activa
+        }
+
+        sede.ownerUid = adminActualUID;
+        sede.nombre = document.getElementById('est-nombre').value.trim();
+        sede.direccion = document.getElementById('est-direccion').value.trim();
+        sede.tarifaHora = Math.max(0, Number(document.getElementById('est-tarifa').value) || 0);
+        sede.niveles = Number(document.getElementById('est-niveles').value) || 1;
+        sede.lat = Number(document.getElementById('est-lat').value) || 19.8454;
+        sede.lng = Number(document.getElementById('est-lng').value) || -90.5358;
+
+        sede.configCobros = {
+            cobrarReserva: chkCobrarReserva.checked,
+            cobrarMulta: chkCobrarMulta.checked,
+            precioMulta: Math.max(0, Number(document.getElementById('est-precio-multa').value) || 0),
+            toleranciaMinutos: Math.max(1, Number(document.getElementById('est-tolerancia-min').value) || 15),
+            paquetes: paquetesActualizados
+        };
+
+        if (!sede.pisos) sede.pisos = {};
+        for (let i = 1; i <= sede.niveles; i++) {
+            if (!sede.pisos[String(i)]) {
+                sede.pisos[String(i)] = {
+                    columnas: 5,
+                    filas: 4,
+                    celdas: Array.from({ length: 20 }, (_, idx) => ({
+                        tipo: idx < 10 ? 'cajon' : 'calle',
+                        codigo: `P${i}-${idx + 1}`,
+                        sensorFisico: ''
+                    }))
+                };
+            }
+        }
+
+        guardarCatalogoEnNubeYLocal();
+        refrescarTodaLaVistaAdmin();
+        showToast("¡Configuración de cobros, dirección y ubicación guardadas!", "success");
     });
 
     // --- PESTAÑA 1: MONITOR EN TIEMPO REAL ---
     function renderizarPillsMonitor() {
         const contenedor = document.getElementById('pisos-monitor-tabs');
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const sede = catalogoGlobal[estacionamientoActivoId];
         if (!contenedor || !sede) return;
 
         contenedor.innerHTML = '';
@@ -258,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function dibujarMapaAdmin() {
         const mapaContainer = document.getElementById('admin-mapa-container');
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const sede = catalogoGlobal[estacionamientoActivoId];
         if (!mapaContainer || !sede || !sede.pisos) return;
 
         const datosPiso = sede.pisos[String(pisoMonitorActual)] || sede.pisos["1"];
@@ -277,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         datosPiso.celdas.forEach((celda) => {
             if (celda.tipo === 'vacio') {
-                html += `<div style="min-height: 68px; border-radius: 8px; background: transparent;"></div>`;
+                html += `<div style="min-height: 68px; border-radius: 8px;"></div>`;
                 return;
             }
             if (celda.tipo === 'calle') {
@@ -343,10 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function mostrarInspeccionCajon(codigoCajon, sensorFisico, datosTicket) {
         const infoVehiculo = document.getElementById('info-vehiculo');
-        const tipoSensorTexto = sensorFisico
-            ? `🔌 Hardware ESP32 (${sensorFisico})`
-            : `☁️ Sensor Virtual IoT`;
-
+        const tipoSensorTexto = sensorFisico ? `🔌 Hardware ESP32 (${sensorFisico})` : `☁️ Sensor Virtual IoT`;
         const estadoActualSensor = sensorFisico
             ? (adminEstadoFisico[sensorFisico] || 'libre')
             : ((adminSensoresVirtuales[estacionamientoActivoId] || {})[codigoCajon] || 'libre');
@@ -438,125 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- PESTAÑA 2: MAPA SIN API KEY (OPENSTREETMAP OFICIAL) ---
-// Reemplaza únicamente la función inicializarMapaLeaflet() en tu js/admin.js por esta:
-    function inicializarMapaLeaflet() {
-        const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
-        const lat = Number(sede.lat) || 19.8454;
-        const lng = Number(sede.lng) || -90.5358;
-
-        async function obtenerDireccionDesdeCoordenadas(latitud, longitud) {
-            document.getElementById('est-lat').value = latitud.toFixed(6);
-            document.getElementById('est-lng').value = longitud.toFixed(6);
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitud}&lon=${longitud}`);
-                const data = await res.json();
-                if (data && data.display_name) {
-                    // Recorta la dirección para dejar calle, barrio y ciudad limpios
-                    const partes = data.display_name.split(',').slice(0, 4).join(', ');
-                    document.getElementById('est-direccion').value = partes;
-                }
-            } catch (err) {
-                console.warn("No se pudo autocompletar el nombre de la calle:", err);
-            }
-        }
-
-        if (!mapaLeaflet) {
-            mapaLeaflet = L.map('mapa-admin-leaflet').setView([lat, lng], 15);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap'
-            }).addTo(mapaLeaflet);
-
-            marcadorLeaflet = L.marker([lat, lng], { draggable: true }).addTo(mapaLeaflet);
-
-            mapaLeaflet.on('click', (e) => {
-                marcadorLeaflet.setLatLng([e.latlng.lat, e.latlng.lng]);
-                obtenerDireccionDesdeCoordenadas(e.latlng.lat, e.latlng.lng);
-            });
-
-            marcadorLeaflet.on('dragend', () => {
-                const pos = marcadorLeaflet.getLatLng();
-                obtenerDireccionDesdeCoordenadas(pos.lat, pos.lng);
-            });
-        } else {
-            mapaLeaflet.invalidateSize();
-            mapaLeaflet.setView([lat, lng], 15);
-            marcadorLeaflet.setLatLng([lat, lng]);
-        }
-    }
-
-    function cargarFormularioSedeActiva() {
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
-        if (!sede) return;
-        document.getElementById('est-nombre').value = sede.nombre || '';
-        document.getElementById('est-direccion').value = sede.direccion || '';
-        document.getElementById('est-tarifa').value = sede.tarifaHora || 25;
-        document.getElementById('est-niveles').value = String(sede.niveles || 2);
-        document.getElementById('est-lat').value = sede.lat || 19.845400;
-        document.getElementById('est-lng').value = sede.lng || -90.535800;
-    }
-
-    document.getElementById('btn-nuevo-estacionamiento').addEventListener('click', () => {
-        const nuevoId = 'parkil_sede_' + Date.now().toString().slice(-5);
-        const nuevaSede = crearEstacionamientoPorDefecto();
-        nuevaSede.id = nuevoId;
-        nuevaSede.nombre = "Nueva Sucursal Parkil";
-        nuevaSede.direccion = "San Francisco de Campeche";
-        nuevaSede.lat = 19.848500;
-        nuevaSede.lng = -90.532000;
-        Object.values(nuevaSede.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
-
-        catalogoEstacionamientos[nuevoId] = nuevaSede;
-        estacionamientoActivoId = nuevoId;
-        localStorage.setItem('adminEstacionamientoId', nuevoId);
-        guardarCatalogoEnNubeYLocal();
-
-        actualizarSelectorSedes();
-        cargarFormularioSedeActiva();
-        renderizarPillsMonitor();
-        dibujarMapaAdmin();
-        renderizarConstructor();
-        if (mapaLeaflet) inicializarMapaLeaflet();
-        showToast("Nueva sucursal creada. Edita sus datos y ubicación.", "info");
-    });
-
-    document.getElementById('form-alta-estacionamiento').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
-        if (!sede) return;
-
-        sede.nombre = document.getElementById('est-nombre').value.trim();
-        sede.direccion = document.getElementById('est-direccion').value.trim();
-        sede.tarifaHora = Number(document.getElementById('est-tarifa').value) || 25;
-        sede.niveles = Number(document.getElementById('est-niveles').value) || 1;
-        sede.lat = Number(document.getElementById('est-lat').value) || 19.8454;
-        sede.lng = Number(document.getElementById('est-lng').value) || -90.5358;
-
-        if (!sede.pisos) sede.pisos = {};
-        for (let i = 1; i <= sede.niveles; i++) {
-            if (!sede.pisos[String(i)]) {
-                sede.pisos[String(i)] = {
-                    columnas: 5,
-                    filas: 4,
-                    celdas: Array.from({ length: 20 }, (_, idx) => ({
-                        tipo: idx < 10 ? 'cajon' : 'calle',
-                        codigo: `P${i}-${idx + 1}`,
-                        sensorFisico: ''
-                    }))
-                };
-            }
-        }
-
-        guardarCatalogoEnNubeYLocal();
-        actualizarSelectorSedes();
-        renderizarPillsMonitor();
-        dibujarMapaAdmin();
-        renderizarConstructor();
-        showToast("¡Datos y ubicación guardados exitosamente!", "success");
-    });
-
-    // --- PESTAÑA 3: CONSTRUCTOR DE ESTACIONAMIENTO (MODO JUEGO) ---
+    // --- PESTAÑA 3: CONSTRUCTOR DE NIVELES ---
     document.querySelectorAll('.tool-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('activo'));
@@ -566,7 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderizarConstructor() {
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const sede = catalogoGlobal[estacionamientoActivoId];
         const gridContainer = document.getElementById('grid-builder-container');
         const pisosTabs = document.getElementById('builder-pisos-tabs');
         if (!sede || !gridContainer || !pisosTabs) return;
@@ -590,9 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gridContainer.style.gridTemplateColumns = `repeat(${pisoObj.columnas}, minmax(95px, 1fr))`;
         gridContainer.innerHTML = '';
 
-        let totalCajones = 0;
-        let totalFisicos = 0;
-        let totalDisc = 0;
+        let totalCajones = 0, totalFisicos = 0, totalDisc = 0;
 
         pisoObj.celdas.forEach((celda, idx) => {
             if (celda.tipo === 'cajon' || celda.tipo === 'discapacitado') totalCajones++;
@@ -602,26 +800,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = `celda-plano tipo-${celda.tipo} ${celdaEditandoIndex === idx ? 'editando' : ''}`;
 
-            let contenido = '';
-            if (celda.tipo === 'cajon') {
-                contenido = `<strong>🚗 ${celda.codigo || 'C' + (idx + 1)}</strong><small style="font-size:0.68rem;">${celda.sensorFisico ? '🔌 ' + celda.sensorFisico : '☁️ Virtual'}</small>`;
-            } else if (celda.tipo === 'discapacitado') {
-                contenido = `<strong>♿ ${celda.codigo || 'E' + (idx + 1)}</strong><small style="font-size:0.68rem;">Preferente</small>`;
-            } else if (celda.tipo === 'elevador') {
-                contenido = `<span style="font-size:1.3rem;">🛗</span><small style="font-weight:700;">ELEVADOR</small>`;
-            } else if (celda.tipo === 'escalera') {
-                contenido = `<span style="font-size:1.3rem;">🪜</span><small style="font-weight:700;">ESCALERA</small>`;
-            } else if (celda.tipo === 'entrada') {
-                contenido = `<span style="font-size:1.3rem;">🚧</span><small style="font-weight:700;">ENTRADA</small>`;
-            } else if (celda.tipo === 'salida') {
-                contenido = `<span style="font-size:1.3rem;">🏁</span><small style="font-weight:700;">SALIDA</small>`;
-            } else if (celda.tipo === 'calle') {
-                contenido = `<span>🛣️ Carril</span>`;
-            } else {
-                contenido = `<span style="color:#52525b; font-size:0.75rem;">Vacío</span>`;
-            }
+            const vistas = {
+                cajon: `<strong>🚗 ${celda.codigo || 'C' + (idx + 1)}</strong><small style="font-size:0.68rem;">${celda.sensorFisico ? '🔌 ' + celda.sensorFisico : '☁️ Virtual'}</small>`,
+                discapacitado: `<strong>♿ ${celda.codigo || 'E' + (idx + 1)}</strong><small style="font-size:0.68rem;">Preferente</small>`,
+                elevador: `<span style="font-size:1.3rem;">🛗</span><small style="font-weight:700;">ELEVADOR</small>`,
+                escalera: `<span style="font-size:1.3rem;">🪜</span><small style="font-weight:700;">ESCALERA</small>`,
+                entrada: `<span style="font-size:1.3rem;">🚧</span><small style="font-weight:700;">ENTRADA</small>`,
+                salida: `<span style="font-size:1.3rem;">🏁</span><small style="font-weight:700;">SALIDA</small>`,
+                calle: `<span>🛣️ Carril</span>`,
+                vacio: `<span style="color:#52525b; font-size:0.75rem;">Vacío</span>`
+            };
 
-            div.innerHTML = contenido;
+            div.innerHTML = vistas[celda.tipo] || vistas.vacio;
             div.addEventListener('click', () => aplicarHerramientaEnCelda(pisoObj, idx));
             gridContainer.appendChild(div);
         });
@@ -674,22 +864,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('select-grid-size').addEventListener('change', (e) => {
         const [cols, rows] = e.target.value.split('x').map(Number);
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const sede = catalogoGlobal[estacionamientoActivoId];
         if (!sede) return;
-        const nuevoTotal = cols * rows;
-        const celdasNuevas = Array.from({ length: nuevoTotal }, (_, i) => {
-            const letra = String.fromCharCode(65 + Math.floor(i / cols));
-            const num = (i % cols) + 1;
-            return { tipo: 'cajon', codigo: `${letra}${num}`, sensorFisico: '' };
-        });
+        const celdasNuevas = Array.from({ length: cols * rows }, (_, i) => ({
+            tipo: 'cajon',
+            codigo: `${String.fromCharCode(65 + Math.floor(i / cols))}${(i % cols) + 1}`,
+            sensorFisico: ''
+        }));
         sede.pisos[String(pisoBuilderActual)] = { columnas: cols, filas: rows, celdas: celdasNuevas };
         renderizarConstructor();
     });
 
     document.getElementById('btn-plantilla-maqueta').addEventListener('click', () => {
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const sede = catalogoGlobal[estacionamientoActivoId];
         if (!sede) return;
-        sede.pisos["1"] = crearEstacionamientoPorDefecto().pisos["1"];
+        sede.pisos["1"] = crearEstacionamientoPorDefecto(adminActualUID).pisos["1"];
         pisoBuilderActual = 1;
         renderizarConstructor();
         dibujarMapaAdmin();
@@ -702,24 +891,15 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast("¡Plano del estacionamiento guardado y publicado en vivo!", "success");
     });
 
-    // --- RENDERIZADO INMEDIATO AL ABRIR LA PÁGINA ---
-    actualizarSelectorSedes();
-    cargarFormularioSedeActiva();
-    renderizarPillsMonitor();
-    dibujarMapaAdmin();
-    renderizarConstructor();
-
-    // --- ESCUCHA EN VIVO DE SENSORES Y TICKETS EN FIREBASE ---
+    // --- ESCUCHAS EN TIEMPO REAL ---
     onValue(ref(db, 'estacionamientos_red'), (snapshot) => {
         const nube = snapshot.val();
         if (nube && Object.keys(nube).length > 0) {
-            catalogoEstacionamientos = nube;
-            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(nube));
+            catalogoGlobal = asegurarSucursalesSimuladasRed(nube);
+            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoGlobal));
             actualizarSelectorSedes();
-            cargarFormularioSedeActiva();
             renderizarPillsMonitor();
             dibujarMapaAdmin();
-            renderizarConstructor();
         }
     });
 
@@ -742,21 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dibujarMapaAdmin();
     });
 
-    // Recolector automático de reservas expiradas
-    setInterval(() => {
-        const ahora = Date.now();
-        for (let id in adminTicketsActivos) {
-            const t = adminTicketsActivos[id];
-            if (t.estado === 'reservado' && t.timestampExpiracion && ahora > (t.timestampExpiracion + 60000)) {
-                set(ref(db, `tickets_activos/${id}`), null);
-                if (t.cajon) set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
-                showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
-                delete adminTicketsActivos[id];
-            }
-        }
-    }, 4000);
-
-    // --- BOTONES DE PLUMA, RESOLUCIONES E HISTORIAL ---
+    // --- PLUMAS, CENTRO DE RESOLUCIONES E HISTORIAL FILTRADO POR MIS SUCURSALES ---
     document.getElementById('btn-emergencia-entrada').addEventListener('click', () => {
         set(ref(db, 'control_plumas/entrada'), 'abrir');
         showToast("Señal enviada: Abriendo pluma de Entrada", "info");
@@ -775,11 +941,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = inputBusqueda.value.trim().toUpperCase();
         if (!query) { showToast("Ingresa una placa o código PARK-XXXX", "error"); return; }
 
-        let encontrado = null;
-        let idEncontrado = null;
+        const misIds = Object.keys(obtenerMisEstacionamientos());
+        let encontrado = null, idEncontrado = null;
+
         for (let id in adminTicketsActivos) {
             const t = adminTicketsActivos[id];
-            if (id.toUpperCase() === query || (t.placa || '').toUpperCase() === query) {
+            const esMio = !t.estacionamientoId || misIds.includes(t.estacionamientoId);
+            if (esMio && (id.toUpperCase() === query || (t.placa || '').toUpperCase() === query)) {
                 encontrado = t;
                 idEncontrado = id;
                 break;
@@ -788,7 +956,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         divResultado.classList.remove('oculto');
         if (!encontrado) {
-            divResultado.innerHTML = `<p style="color: var(--danger-neon); text-align:center; font-weight:bold; margin:0;">❌ Vehículo o ticket activo no encontrado</p>`;
+            divResultado.innerHTML = `<p style="color: var(--danger-neon); text-align:center; font-weight:bold; margin:0;">❌ Vehículo o ticket activo no encontrado en tus sucursales</p>`;
             return;
         }
 
@@ -818,14 +986,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function cargarHistorial() {
         try {
+            const misIds = Object.keys(obtenerMisEstacionamientos());
             const querySnapshot = await getDocs(collection(firestoreDB, "historial_tickets"));
-            let totalDinero = 0;
-            let totalTickets = 0;
+            let totalDinero = 0, totalTickets = 0;
             historialGlobal = [];
             let paquetesCount = { 'Express': 0, 'Estándar': 0, 'Reunión': 0, 'Máximo': 0 };
 
             querySnapshot.forEach((documento) => {
                 const ticket = documento.data();
+                // Solo contar tickets que pertenecen a las sucursales de este Administrador
+                if (ticket.estacionamientoId && !misIds.includes(ticket.estacionamientoId)) return;
+
                 ticket.idReal = documento.id;
                 historialGlobal.push(ticket);
 
@@ -838,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (paq.includes('Express')) paquetesCount['Express']++;
                 else if (paq.includes('Est')) paquetesCount['Estándar']++;
                 else if (paq.includes('Reuni')) paquetesCount['Reunión']++;
-                else if (paq.includes('x')) paquetesCount['Máximo']++;
+                else paquetesCount['Máximo']++;
 
                 totalTickets++;
                 totalDinero += sumaTotal;
@@ -878,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderizarTablaHistorial(datos) {
         const tablaBody = document.getElementById('tabla-body-historial');
         if (datos.length === 0) {
-            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay tickets registrados.</td></tr>`;
+            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay tickets registrados en tus sucursales.</td></tr>`;
             return;
         }
         tablaBody.innerHTML = datos.map(t => {
@@ -916,10 +1087,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = "Reporte_Parkil.csv";
+        link.download = "Reporte_Mis_Sucursales_Parkil.csv";
         link.click();
         showToast("Reporte CSV descargado", "success");
     });
 
-    cargarHistorial();
+    refrescarTodaLaVistaAdmin();
 });

@@ -7,11 +7,53 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/admin.css">
     <link rel="icon" type="image/png" href="../icono-parkil.png?v=3">
-    <!-- Chart.js para gráficas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Leaflet CSS & JS para el Mapa de Estacionamientos -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-dark);
+            padding: 12px 14px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+        .switch-row label {
+            margin: 0 !important;
+            color: #fff !important;
+            font-size: 0.88rem !important;
+            text-transform: none !important;
+            cursor: pointer;
+        }
+        .paquete-config-row {
+            display: grid;
+            grid-template-columns: auto 1.3fr 1fr 1fr;
+            gap: 8px;
+            align-items: center;
+            background: #000;
+            border: 1px solid var(--border-dark);
+            padding: 8px 10px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        .btn-danger-outline {
+            background: rgba(255, 69, 58, 0.1);
+            color: #FF453A;
+            border: 1px solid #FF453A;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-danger-outline:hover {
+            background: #FF453A;
+            color: #fff;
+        }
+    </style>
 </head>
 <body class="bg-app text-main">
 
@@ -22,12 +64,12 @@
                 <div class="logo-admin-svg" id="logo-header-admin"></div>
                 <div>
                     <h1>Parkil Studio & Control</h1>
-                    <p id="subtitulo-sede">Cargando estacionamiento...</p>
+                    <p id="subtitulo-sede">Cargando tus sucursales...</p>
                 </div>
             </div>
 
             <div class="acciones-header">
-                <select id="selector-estacionamiento-activo" class="select-sede" title="Cambiar estacionamiento activo"></select>
+                <select id="selector-estacionamiento-activo" class="select-sede" title="Mis estacionamientos"></select>
                 <button id="btn-emergencia-entrada" class="btn-pluma">🚧 Abrir Entrada</button>
                 <button id="btn-emergencia-salida" class="btn-pluma">🏁 Abrir Salida</button>
                 <a href="dashboard.html" class="btn-neon-outline">Vista Conductor</a>
@@ -35,21 +77,21 @@
             </div>
         </header>
 
-        <!-- NAVEGACIÓN POR PESTAÑAS (TABS) -->
+        <!-- NAVEGACIÓN POR PESTAÑAS -->
         <nav class="admin-tabs">
             <button class="tab-btn activo" data-tab="tab-operacion">📊 Operación en Vivo</button>
-            <button class="tab-btn" data-tab="tab-alta-mapa">📍 Alta y Ubicación (Mapa)</button>
+            <button class="tab-btn" data-tab="tab-alta-mapa">💰 Sucursal, Cobros y Mapa</button>
             <button class="tab-btn" data-tab="tab-constructor">🏗️ Constructor de Niveles (Juego)</button>
         </nav>
 
         <!-- =========================================================
-             PESTAÑA 1: OPERACIÓN EN VIVO (SENSORES, PLUMAS Y CAJA)
+             PESTAÑA 1: OPERACIÓN EN VIVO
         ========================================================== -->
         <div id="tab-operacion" class="tab-content activo">
             <div class="top-stats-grid">
                 <div class="stats-column">
                     <div class="stats-card">
-                        <h3>Ingresos Totales</h3>
+                        <h3>Ingresos de Mis Sucursales</h3>
                         <div class="numero" id="stat-ingresos">$0.00</div>
                     </div>
                     <div class="stats-card">
@@ -63,7 +105,6 @@
             </div>
 
             <div class="admin-grid">
-                <!-- Monitor en Tiempo Real Multi-Piso -->
                 <section>
                     <div class="seccion-header-inline">
                         <h2>Monitor de Cajones en Tiempo Real</h2>
@@ -83,7 +124,6 @@
                     </div>
                 </section>
 
-                <!-- Inspección de Cajón / Vehículo -->
                 <section>
                     <h2>Inspección de Cajón y Sensor</h2>
                     <div id="info-vehiculo" class="stats-card" style="margin-top: 0.8rem; text-align: left; min-height: 240px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
@@ -91,7 +131,6 @@
                     </div>
                 </section>
 
-                <!-- Centro de Resoluciones -->
                 <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 1rem; border-top: 3px solid var(--spot-selected);">
                     <h3 class="titulo-seccion">Centro de Resoluciones y Cobro en Caseta</h3>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -102,10 +141,9 @@
                 </section>
             </div>
 
-            <!-- Historial de Pagos -->
             <section style="margin-top: 2rem;">
                 <div class="seccion-header-inline" style="border-bottom: 1px solid var(--border-dark); margin-bottom: 1rem; padding-bottom: 10px;">
-                    <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos</h2>
+                    <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos (Mis Sucursales)</h2>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa o cliente..." class="input-dark" style="width: 240px;">
                         <button id="btn-exportar-csv" class="btn-csv">📥 Exportar CSV</button>
@@ -119,7 +157,7 @@
                                 <th>Código</th>
                                 <th>Cliente / Placa</th>
                                 <th>Estacionamiento / Cajón</th>
-                                <th>Tiempo</th>
+                                <th>Paquete / Modalidad</th>
                                 <th>Liquidado</th>
                                 <th>Estado</th>
                             </tr>
@@ -133,28 +171,33 @@
         </div>
 
         <!-- =========================================================
-             PESTAÑA 2: ALTA DE ESTACIONAMIENTO Y UBICACIÓN EN MAPA
+             PESTAÑA 2: ALTA, CONFIGURACIÓN DE COBROS Y MAPA
         ========================================================== -->
         <div id="tab-alta-mapa" class="tab-content oculto">
             <div class="admin-grid">
                 <section class="stats-card" style="text-align: left;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h2 style="margin: 0; border: none;">Datos del Estacionamiento</h2>
-                        <button type="button" id="btn-nuevo-estacionamiento" class="btn-neon-outline" style="font-size: 0.8rem; padding: 6px 12px;">+ Crear Nueva Sucursal</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;">
+                        <h2 style="margin: 0; border: none;">1. Datos y Reglas de Cobro</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" id="btn-nuevo-estacionamiento" class="btn-neon-outline" style="font-size: 0.78rem; padding: 6px 10px;">+ Nueva Sucursal</button>
+                            <button type="button" id="btn-eliminar-estacionamiento" class="btn-danger-outline">🗑️ Eliminar Sucursal</button>
+                        </div>
                     </div>
+
                     <form id="form-alta-estacionamiento" class="form-admin-grid">
                         <div>
-                            <label>Nombre Comercial del Estacionamiento</label>
+                            <label>Nombre Comercial de tu Estacionamiento</label>
                             <input type="text" id="est-nombre" class="input-dark" placeholder="Ej. Parkil Plaza Centro Campeche" required>
                         </div>
                         <div>
-                            <label>Dirección Física / Referencia</label>
+                            <label>Dirección Física / Referencia (Autocompletable en Mapa)</label>
                             <input type="text" id="est-direccion" class="input-dark" placeholder="Ej. Calle 10 #245, Centro Histórico, Campeche" required>
                         </div>
+
                         <div class="fila-2-col">
                             <div>
-                                <label>Tarifa por Hora ($ MXN)</label>
-                                <input type="number" id="est-tarifa" class="input-dark" value="25" min="5" step="1" required>
+                                <label>Tarifa por Hora de Estancia ($ MXN)</label>
+                                <input type="number" id="est-tarifa" class="input-dark" value="25" min="0" step="1" required>
                             </div>
                             <div>
                                 <label>Número de Niveles / Pisos</label>
@@ -165,6 +208,47 @@
                                 </select>
                             </div>
                         </div>
+
+                        <!-- MÓDULO DE CONFIGURACIÓN DE COBROS, RESERVAS Y MULTAS -->
+                        <div style="border-top: 1px dashed var(--border-dark); padding-top: 12px; margin-top: 4px;">
+                            <h3 style="color: var(--spot-selected); font-size: 0.9rem; margin-bottom: 10px;">💰 ¿Qué conceptos deseas cobrar en esta sucursal?</h3>
+
+                            <!-- Switch Cobrar Reserva -->
+                            <div class="switch-row">
+                                <div>
+                                    <label for="chk-cobrar-reserva"><strong>Cobrar por Reservación Anticipada</strong></label>
+                                    <small style="display:block; color:var(--text-muted); font-size:0.74rem;">Si lo desactivas, apartar cajón será gratis ($0) y el cliente solo pagará su estancia al salir.</small>
+                                </div>
+                                <input type="checkbox" id="chk-cobrar-reserva" checked style="width: 20px; height: 20px; accent-color: #0A84FF; cursor: pointer;">
+                            </div>
+
+                            <!-- Configuración de Paquetes de Reserva -->
+                            <div id="contenedor-config-paquetes" style="margin-bottom: 12px;">
+                                <label style="margin-bottom: 6px;">Paquetes de Tiempo para Reservar (Activa los que quieras manejar):</label>
+                                <div id="lista-paquetes-admin"></div>
+                            </div>
+
+                            <!-- Switch Cobrar Multas -->
+                            <div class="switch-row">
+                                <div>
+                                    <label for="chk-cobrar-multa"><strong>Cobrar Multa / Recargo por Exceder Salida</strong></label>
+                                    <small style="display:block; color:var(--text-muted); font-size:0.74rem;">Aplica si el conductor paga pero no sale del estacionamiento dentro del tiempo de tolerancia.</small>
+                                </div>
+                                <input type="checkbox" id="chk-cobrar-multa" checked style="width: 20px; height: 20px; accent-color: #FF453A; cursor: pointer;">
+                            </div>
+
+                            <div id="wrapper-precio-multa" class="fila-2-col" style="margin-top: 8px;">
+                                <div>
+                                    <label>Monto de Multa por Hora Extra ($ MXN)</label>
+                                    <input type="number" id="est-precio-multa" class="input-dark" value="25" min="0" step="1">
+                                </div>
+                                <div>
+                                    <label>Tolerancia para Salir tras Pagar (Minutos)</label>
+                                    <input type="number" id="est-tolerancia-min" class="input-dark" value="15" min="1" step="1">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="fila-2-col">
                             <div>
                                 <label>Latitud (Mapa)</label>
@@ -175,18 +259,17 @@
                                 <input type="number" id="est-lng" class="input-dark" step="any" readonly required>
                             </div>
                         </div>
-                        <div style="margin-top: 0.5rem;">
-                            <button type="submit" class="btn-primario-azul" style="width: 100%; padding: 14px;">💾 Guardar Datos y Ubicación en la Nube</button>
-                        </div>
+
+                        <button type="submit" class="btn-primario-azul" style="width: 100%; padding: 14px; font-size: 1rem;">💾 Guardar Configuración y Tarifas de la Sucursal</button>
                     </form>
                 </section>
 
                 <section class="stats-card" style="text-align: left; display: flex; flex-direction: column;">
-                    <h2 style="margin-top: 0;">Ubicación en el Mapa (Haz clic donde está tu local)</h2>
+                    <h2 style="margin-top: 0;">2. Ubicación en el Mapa (Haz clic o arrastra el pin)</h2>
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 10px;">
-                        Haz clic en cualquier punto de la ciudad para colocar el pin de tu estacionamiento. Los conductores lo verán en su mapa en tiempo real.
+                        Haz clic donde se ubica tu estacionamiento para autocompletar su dirección y coordenadas. Una vez que presiones <b>Guardar</b>, quedará fijo para los conductores.
                     </p>
-                    <div id="mapa-admin-leaflet" style="flex: 1; min-height: 360px; width: 100%; border-radius: 12px; border: 1px solid var(--border-dark);"></div>
+                    <div id="mapa-admin-leaflet" style="flex: 1; min-height: 440px; width: 100%; border-radius: 12px; border: 1px solid var(--border-dark);"></div>
                 </section>
             </div>
         </div>
@@ -196,7 +279,6 @@
         ========================================================== -->
         <div id="tab-constructor" class="tab-content oculto">
             <div class="builder-layout">
-                <!-- Paleta de Herramientas Izquierda -->
                 <aside class="stats-card builder-sidebar" style="text-align: left;">
                     <h2 style="margin-top: 0;">1. Elige una Herramienta</h2>
                     <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem;">
@@ -262,7 +344,6 @@
                         </button>
                     </div>
 
-                    <!-- Inspector de Sensor Físico vs Virtual -->
                     <div id="inspector-celda-builder" class="inspector-builder oculto">
                         <h3 style="color: #fff; font-size: 0.9rem; margin-bottom: 8px;">⚡ Configurar Cajón <span id="lbl-cajon-edit" style="color: var(--spot-selected);">A1</span></h3>
                         <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Código del Cajón:</label>
@@ -278,13 +359,9 @@
                             <option value="cajon_5">🔌 Sensor Físico 5 (cajon_5 - Maqueta)</option>
                             <option value="cajon_6">🔌 Sensor Físico 6 (cajon_6 - Maqueta)</option>
                         </select>
-                        <small style="display: block; color: var(--text-muted); font-size: 0.72rem; margin-top: 6px;">
-                            Los cajones vinculados a <b>cajon_1..6</b> responden en vivo a tu maqueta física. Los demás operan mediante sensores virtuales.
-                        </small>
                     </div>
                 </aside>
 
-                <!-- Lienzo del Constructor Derecha -->
                 <section class="stats-card builder-canvas-area">
                     <div class="builder-top-bar">
                         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -309,7 +386,6 @@
                         Total cajones: 0 | Con sensor físico: 0 | Discapacitados: 0
                     </div>
 
-                    <!-- Cuadrícula Interactiva -->
                     <div id="grid-builder-container" class="grid-builder"></div>
                 </section>
             </div>
