@@ -1,12 +1,12 @@
-// js/admin.js - Suite Administrativa, Mapa y Constructor 2D de Parkil
+// js/admin.js - Suite Administrativa, Mapa Libre de API Key y Constructor 2D con Carga Instantánea
 import {
     auth, firestoreDB, db, PARKIL_CONFIG, obtenerLogoParkilSVG,
     onAuthStateChanged, signOut, collection, getDocs,
-    ref, onValue, set, get, doc, setDoc, update
+    ref, onValue, set, doc, setDoc, update
 } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Insertar el nuevo logo en el header
+    // 1. Insertar el nuevo logo en el header
     const logoContainer = document.getElementById('logo-header-admin');
     if (logoContainer) logoContainer.innerHTML = obtenerLogoParkilSVG(48);
 
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- NOTIFICACIONES TOAST CON ICONOS CORREGIDOS ---
+    // --- NOTIFICACIONES TOAST ---
     function showToast(mensaje, tipo = 'info') {
         let container = document.getElementById('toast-container');
         if (!container) {
@@ -42,43 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3800);
     }
 
-    // --- NAVEGACIÓN DE PESTAÑAS (TABS) ---
-    let mapaLeaflet = null;
-    let marcadorLeaflet = null;
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('oculto'));
-
-            btn.classList.add('activo');
-            const targetId = btn.getAttribute('data-tab');
-            document.getElementById(targetId).classList.remove('oculto');
-
-            if (targetId === 'tab-alta-mapa') {
-                setTimeout(() => inicializarMapaLeaflet(), 150);
-            }
-            if (targetId === 'tab-constructor') {
-                renderizarConstructor();
-            }
-        });
-    });
-
-    // --- ESTADO GLOBAL DEL ADMINISTRADOR ---
-    let catalogoEstacionamientos = {};
-    let estacionamientoActivoId = localStorage.getItem('adminEstacionamientoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
-    let pisoMonitorActual = 1;
-    let pisoBuilderActual = 1;
-    let herramientaActual = 'cajon';
-    let celdaEditandoIndex = null;
-
-    let adminTicketsActivos = {};
-    let adminEstadoFisico = {}; // Sensores reales ESP32 (cajon_1..6)
-    let adminSensoresVirtuales = {}; // Sensores simulados para estacionamientos grandes
-    let historialGlobal = [];
-    let chartInstancia = null;
-
-    // --- PLANTILLA INICIAL POR DEFECTO (Conecta los 6 sensores de la maqueta + accesibilidad) ---
+    // --- PLANTILLAS INICIALES (Maqueta 2 Pisos + Sucursal Galerías) ---
     function crearEstacionamientoPorDefecto() {
         return {
             id: PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID,
@@ -86,8 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
             direccion: "Calle 10 #245, Centro Histórico, San Francisco de Campeche",
             tarifaHora: 25,
             niveles: 2,
-            lat: 19.8454,
-            lng: -90.5358,
+            lat: 19.845400,
+            lng: -90.535800,
             pisos: {
                 "1": {
                     columnas: 5,
@@ -151,47 +115,88 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // --- 1. SINCRONIZAR CATÁLOGO DE ESTACIONAMIENTOS EN FIREBASE ---
-    const redRef = ref(db, 'estacionamientos_red');
-    onValue(redRef, async (snapshot) => {
-        const data = snapshot.val();
-        if (!data) {
-            const def = crearEstacionamientoPorDefecto();
-            // También creamos una segunda sucursal simulada en Campeche para que el mapa del conductor luzca increíble
-            const suc2 = {
-                id: "parkil_galerias_campeche",
-                nombre: "Parkil Plaza Galerías Ah-Kim-Pech",
-                direccion: "Av. Pedro Sainz de Baranda, Ah-Kim-Pech, Campeche",
-                tarifaHora: 30,
-                niveles: 1,
-                lat: 19.8528,
-                lng: -90.5295,
-                pisos: {
-                    "1": {
-                        columnas: 5,
-                        filas: 4,
-                        celdas: crearEstacionamientoPorDefecto().pisos["1"].celdas.map(c => ({ ...c, sensorFisico: "" }))
-                    }
-                }
-            };
-            await set(ref(db, `estacionamientos_red/${def.id}`), def);
-            await set(ref(db, `estacionamientos_red/${suc2.id}`), suc2);
-            return;
+    function obtenerCatalogoInicial() {
+        try {
+            const guardado = localStorage.getItem('parkil_catalogo_sedes');
+            if (guardado) {
+                const parsed = JSON.parse(guardado);
+                if (parsed && Object.keys(parsed).length > 0) return parsed;
+            }
+        } catch (e) {
+            console.warn("Cargando catálogo por defecto...");
         }
 
-        catalogoEstacionamientos = data;
-        if (!catalogoEstacionamientos[estacionamientoActivoId]) {
-            estacionamientoActivoId = Object.keys(catalogoEstacionamientos)[0];
-        }
-        actualizarSelectorSedes();
-        cargarFormularioSedeActiva();
-        renderizarPillsMonitor();
-        dibujarMapaAdmin();
-        renderizarConstructor();
+        const sede1 = crearEstacionamientoPorDefecto();
+        const sede2 = {
+            id: "parkil_galerias_campeche",
+            nombre: "Parkil Plaza Galerías Ah-Kim-Pech",
+            direccion: "Av. Pedro Sainz de Baranda, Ah-Kim-Pech, Campeche",
+            tarifaHora: 30,
+            niveles: 2,
+            lat: 19.852800,
+            lng: -90.529500,
+            pisos: JSON.parse(JSON.stringify(sede1.pisos))
+        };
+        Object.values(sede2.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
+
+        const inicial = {
+            [sede1.id]: sede1,
+            [sede2.id]: sede2
+        };
+        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(inicial));
+        return inicial;
+    }
+
+    // --- ESTADO GLOBAL INICIALIZADO AL INSTANTE ---
+    let catalogoEstacionamientos = obtenerCatalogoInicial();
+    let estacionamientoActivoId = localStorage.getItem('adminEstacionamientoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+    if (!catalogoEstacionamientos[estacionamientoActivoId]) {
+        estacionamientoActivoId = Object.keys(catalogoEstacionamientos)[0];
+    }
+
+    let pisoMonitorActual = 1;
+    let pisoBuilderActual = 1;
+    let herramientaActual = 'cajon';
+    let celdaEditandoIndex = null;
+
+    let adminTicketsActivos = {};
+    let adminEstadoFisico = {};
+    let adminSensoresVirtuales = JSON.parse(localStorage.getItem('parkil_sensores_virtuales') || '{}');
+    let historialGlobal = [];
+    let chartInstancia = null;
+    let mapaLeaflet = null;
+    let marcadorLeaflet = null;
+
+    function guardarCatalogoEnNubeYLocal() {
+        localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoEstacionamientos));
+        set(ref(db, 'estacionamientos_red'), catalogoEstacionamientos).catch(() => {
+            console.log("Guardado localmente (modo sin permisos de escritura en rama nueva de RTDB).");
+        });
+    }
+
+    // --- NAVEGACIÓN DE PESTAÑAS (TABS) ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('oculto'));
+
+            btn.classList.add('activo');
+            const targetId = btn.getAttribute('data-tab');
+            document.getElementById(targetId).classList.remove('oculto');
+
+            if (targetId === 'tab-alta-mapa') {
+                setTimeout(() => inicializarMapaLeaflet(), 150);
+            }
+            if (targetId === 'tab-constructor') {
+                renderizarConstructor();
+            }
+        });
     });
 
+    // --- SELECTOR DE SEDES ---
     const selectorSede = document.getElementById('selector-estacionamiento-activo');
     function actualizarSelectorSedes() {
+        if (!selectorSede) return;
         selectorSede.innerHTML = '';
         Object.values(catalogoEstacionamientos).forEach(est => {
             const opt = document.createElement('option');
@@ -202,7 +207,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const actual = catalogoEstacionamientos[estacionamientoActivoId];
         if (actual) {
-            document.getElementById('subtitulo-sede').textContent = `${actual.nombre} • $${actual.tarifaHora}/hr • ${actual.niveles} Nivel(es)`;
+            document.getElementById('subtitulo-sede').textContent =
+                `${actual.nombre} • $${actual.tarifaHora}/hr • ${actual.niveles} Nivel(es)`;
         }
     }
 
@@ -216,59 +222,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarPillsMonitor();
         dibujarMapaAdmin();
         renderizarConstructor();
+        if (mapaLeaflet) inicializarMapaLeaflet();
         showToast("Cambiaste de estacionamiento activo", "info");
     });
 
-    // --- 2. MONITOR EN TIEMPO REAL (SENSORES FÍSICOS + VIRTUALES + TICKETS) ---
-    onValue(ref(db, 'tickets_activos'), (snapshot) => {
-        adminTicketsActivos = snapshot.val() || {};
-        dibujarMapaAdmin();
-    });
-
-    onValue(ref(db, 'sensores_virtuales'), (snapshot) => {
-        adminSensoresVirtuales = snapshot.val() || {};
-        dibujarMapaAdmin();
-    });
-
-    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
-        adminEstadoFisico = snapshot.val() || {};
-
-        // Auto Check-In: si un sensor físico se ocupa, iniciamos el timestampIngresoFisico del ticket activo
-        for (let idTicket in adminTicketsActivos) {
-            const t = adminTicketsActivos[idTicket];
-            if (t.estado === 'en_uso' && !t.timestampIngresoFisico) {
-                const sensorId = t.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[t.cajon];
-                if (sensorId && String(adminEstadoFisico[sensorId] || '').trim().toLowerCase() === 'ocupado') {
-                    update(ref(db, `tickets_activos/${idTicket}`), {
-                        timestampIngresoFisico: Date.now()
-                    });
-                }
-            }
-        }
-        dibujarMapaAdmin();
-    });
-
-    // Recolector automático de reservas expiradas (reemplaza a Railway)
-    setInterval(() => {
-        const ahora = Date.now();
-        for (let id in adminTicketsActivos) {
-            const t = adminTicketsActivos[id];
-            if (t.estado === 'reservado' && t.timestampExpiracion) {
-                if (ahora > (t.timestampExpiracion + 60000)) {
-                    set(ref(db, `tickets_activos/${id}`), null);
-                    if (t.cajon) {
-                        set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
-                        if (t.estacionamientoId) {
-                            set(ref(db, `cajones_bloqueados_${t.estacionamientoId}/${t.cajon}`), null);
-                        }
-                    }
-                    showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
-                    delete adminTicketsActivos[id];
-                }
-            }
-        }
-    }, 4000);
-
+    // --- PESTAÑA 1: MONITOR EN TIEMPO REAL ---
     function renderizarPillsMonitor() {
         const contenedor = document.getElementById('pisos-monitor-tabs');
         const sede = catalogoEstacionamientos[estacionamientoActivoId];
@@ -278,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalNiveles = Number(sede.niveles) || 1;
         for (let p = 1; p <= totalNiveles; p++) {
             const btn = document.createElement('button');
+            btn.type = 'button';
             btn.className = `piso-pill ${p === pisoMonitorActual ? 'activo' : ''}`;
             btn.textContent = `Piso ${p}`;
             btn.addEventListener('click', () => {
@@ -305,7 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const datosPiso = sede.pisos[String(pisoMonitorActual)] || sede.pisos["1"];
         if (!datosPiso) return;
 
-        // Mapear tickets activos de esta sede
         const infoPorCajon = {};
         for (let id in adminTicketsActivos) {
             const t = adminTicketsActivos[id];
@@ -323,23 +281,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (celda.tipo === 'calle') {
-                html += `<div style="min-height: 68px; border-radius: 8px; background: #0d0d10; border: 1px dashed rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:#52525b; font-size:0.8rem;">🛣️ ${celda.etiqueta || ''}</div>`;
+                html += `<div style="min-height: 68px; border-radius: 8px; background: #0d0d10; border: 1px dashed rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; color:#71717a; font-size:0.8rem;">🛣️ ${celda.etiqueta || ''}</div>`;
                 return;
             }
             if (celda.tipo === 'elevador' || celda.tipo === 'escalera' || celda.tipo === 'entrada' || celda.tipo === 'salida') {
                 const iconos = { elevador: '🛗 ELEVADOR', escalera: '🪜 ESCALERA', entrada: '🚧 ENTRADA', salida: '🏁 SALIDA' };
-                html += `<div style="min-height: 68px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#e4e4e7; padding:4px;">${iconos[celda.tipo]}</div>`;
+                html += `<div style="min-height: 68px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#e4e4e7; padding:4px;">${iconos[celda.tipo]}</div>`;
                 return;
             }
 
-            // Es un cajón (normal o discapacitado)
             const codigo = celda.codigo;
             const estadoSensor = obtenerEstadoSensorCajon(celda);
             const ticketInfo = infoPorCajon[codigo];
             const esDisc = celda.tipo === 'discapacitado';
 
-            let colorFondo = esDisc ? 'rgba(10, 132, 255, 0.08)' : 'rgba(50, 215, 75, 0.06)';
-            let colorBorde = esDisc ? '#0A84FF' : 'rgba(50, 215, 75, 0.4)';
+            let colorFondo = esDisc ? 'rgba(10, 132, 255, 0.1)' : 'rgba(50, 215, 75, 0.08)';
+            let colorBorde = esDisc ? '#0A84FF' : 'rgba(50, 215, 75, 0.45)';
             let colorTexto = esDisc ? '#60a5fa' : '#32D74B';
             let etiqueta = esDisc ? '♿ LIBRE' : 'LIBRE';
 
@@ -394,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? (adminEstadoFisico[sensorFisico] || 'libre')
             : ((adminSensoresVirtuales[estacionamientoActivoId] || {})[codigoCajon] || 'libre');
 
-        const btnSimularSensor = `<button id="btn-toggle-sensor" style="width:100%; margin-top:8px; padding:10px; border-radius:8px; border:1px solid var(--spot-selected); background:rgba(10,132,255,0.12); color:#fff; font-weight:700; cursor:pointer;">
+        const btnSimularSensor = `<button id="btn-toggle-sensor" style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid var(--spot-selected); background:rgba(10,132,255,0.14); color:#fff; font-weight:700; cursor:pointer;">
             📡 Cambiar Sensor a "${estadoActualSensor === 'ocupado' ? 'LIBRE' : 'OCUPADO'}" (Prueba)
         </button>`;
 
@@ -405,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong style="font-size:1.2rem; color:#fff;">Cajón ${codigoCajon}</strong>
                         <span style="font-size:0.8rem; color:var(--spot-selected);">${tipoSensorTexto}</span>
                     </div>
-                    <p style="color: var(--text-muted); font-size:0.9rem;">Sin reserva activa. Estado físico: <strong style="color:#fff; text-transform:uppercase;">${estadoActualSensor}</strong></p>
+                    <p style="color: var(--text-muted); font-size:0.9rem;">Sin reserva activa. Estado del sensor: <strong style="color:#fff; text-transform:uppercase;">${estadoActualSensor}</strong></p>
                     ${btnSimularSensor}
                 </div>
             `;
@@ -446,47 +403,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            const btnCancelar = document.getElementById('btn-cancelar-reserva');
-            if (btnCancelar) {
-                btnCancelar.addEventListener('click', () => {
-                    set(ref(db, `tickets_activos/${datosTicket.id}`), null);
-                    set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
-                    set(ref(db, `cajones_bloqueados_${estacionamientoActivoId}/${codigoCajon}`), null);
-                    showToast("Reserva cancelada y cajón liberado", "success");
-                });
-            }
+            document.getElementById('btn-cancelar-reserva')?.addEventListener('click', () => {
+                set(ref(db, `tickets_activos/${datosTicket.id}`), null);
+                set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                showToast("Reserva cancelada y cajón liberado", "success");
+            });
 
-            const btnForzar = document.getElementById('btn-forzar-salida');
-            if (btnForzar) {
-                btnForzar.addEventListener('click', async () => {
-                    datosTicket.estadoFinal = "completado_forzoso";
-                    datosTicket.timestampSalida = Date.now();
-                    await setDoc(doc(firestoreDB, "historial_tickets", datosTicket.id), datosTicket);
-                    await set(ref(db, `tickets_activos/${datosTicket.id}`), null);
-                    await set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
-                    await set(ref(db, `cajones_bloqueados_${estacionamientoActivoId}/${codigoCajon}`), null);
-                    showToast("Ticket archivado y cajón liberado", "success");
-                    cargarHistorial();
-                });
-            }
-        }
-
-        const btnToggle = document.getElementById('btn-toggle-sensor');
-        if (btnToggle) {
-            btnToggle.addEventListener('click', async () => {
-                const nuevoEstado = estadoActualSensor === 'ocupado' ? 'libre' : 'ocupado';
-                if (sensorFisico) {
-                    await set(ref(db, `estacionamiento_actual/${sensorFisico}`), nuevoEstado);
-                } else {
-                    await set(ref(db, `sensores_virtuales/${estacionamientoActivoId}/${codigoCajon}`), nuevoEstado);
-                }
-                showToast(`Sensor de ${codigoCajon} cambiado a ${nuevoEstado.toUpperCase()}`, "info");
-                mostrarInspeccionCajon(codigoCajon, sensorFisico, datosTicket);
+            document.getElementById('btn-forzar-salida')?.addEventListener('click', async () => {
+                datosTicket.estadoFinal = "completado_forzoso";
+                datosTicket.timestampSalida = Date.now();
+                await setDoc(doc(firestoreDB, "historial_tickets", datosTicket.id), datosTicket);
+                await set(ref(db, `tickets_activos/${datosTicket.id}`), null);
+                await set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                showToast("Ticket archivado y cajón liberado", "success");
+                cargarHistorial();
             });
         }
+
+        document.getElementById('btn-toggle-sensor')?.addEventListener('click', async () => {
+            const nuevoEstado = estadoActualSensor === 'ocupado' ? 'libre' : 'ocupado';
+            if (sensorFisico) {
+                await set(ref(db, `estacionamiento_actual/${sensorFisico}`), nuevoEstado);
+            } else {
+                if (!adminSensoresVirtuales[estacionamientoActivoId]) {
+                    adminSensoresVirtuales[estacionamientoActivoId] = {};
+                }
+                adminSensoresVirtuales[estacionamientoActivoId][codigoCajon] = nuevoEstado;
+                localStorage.setItem('parkil_sensores_virtuales', JSON.stringify(adminSensoresVirtuales));
+                set(ref(db, `sensores_virtuales/${estacionamientoActivoId}/${codigoCajon}`), nuevoEstado).catch(() => {});
+                dibujarMapaAdmin();
+            }
+            showToast(`Sensor de ${codigoCajon} cambiado a ${nuevoEstado.toUpperCase()}`, "info");
+            mostrarInspeccionCajon(codigoCajon, sensorFisico, datosTicket);
+        });
     }
 
-    // --- 3. PESTAÑA 2: MAPA LEAFLET Y ALTA DE ESTACIONAMIENTO ---
+    // --- PESTAÑA 2: MAPA SIN API KEY (OPENSTREETMAP OFICIAL) ---
     function inicializarMapaLeaflet() {
         const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
         const lat = Number(sede.lat) || 19.8454;
@@ -494,8 +446,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!mapaLeaflet) {
             mapaLeaflet = L.map('mapa-admin-leaflet').setView([lat, lng], 15);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap & CartoDB'
+            // Servidor público oficial de OpenStreetMap (NO requiere API Key jamás)
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
             }).addTo(mapaLeaflet);
 
             marcadorLeaflet = L.marker([lat, lng], { draggable: true }).addTo(mapaLeaflet);
@@ -525,9 +479,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('est-nombre').value = sede.nombre || '';
         document.getElementById('est-direccion').value = sede.direccion || '';
         document.getElementById('est-tarifa').value = sede.tarifaHora || 25;
-        document.getElementById('est-niveles').value = String(sede.niveles || 1);
-        document.getElementById('est-lat').value = sede.lat || 19.8454;
-        document.getElementById('est-lng').value = sede.lng || -90.5358;
+        document.getElementById('est-niveles').value = String(sede.niveles || 2);
+        document.getElementById('est-lat').value = sede.lat || 19.845400;
+        document.getElementById('est-lng').value = sede.lng || -90.535800;
     }
 
     document.getElementById('btn-nuevo-estacionamiento').addEventListener('click', () => {
@@ -536,21 +490,29 @@ document.addEventListener('DOMContentLoaded', () => {
         nuevaSede.id = nuevoId;
         nuevaSede.nombre = "Nueva Sucursal Parkil";
         nuevaSede.direccion = "San Francisco de Campeche";
-        nuevaSede.lat = 19.8485;
-        nuevaSede.lng = -90.5320;
-        // Limpiar sensores físicos para que no choquen con la matriz
+        nuevaSede.lat = 19.848500;
+        nuevaSede.lng = -90.532000;
         Object.values(nuevaSede.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
 
         catalogoEstacionamientos[nuevoId] = nuevaSede;
         estacionamientoActivoId = nuevoId;
+        localStorage.setItem('adminEstacionamientoId', nuevoId);
+        guardarCatalogoEnNubeYLocal();
+
+        actualizarSelectorSedes();
         cargarFormularioSedeActiva();
-        inicializarMapaLeaflet();
-        showToast("Formulario listo para registrar la nueva sucursal", "info");
+        renderizarPillsMonitor();
+        dibujarMapaAdmin();
+        renderizarConstructor();
+        if (mapaLeaflet) inicializarMapaLeaflet();
+        showToast("Nueva sucursal creada. Edita sus datos y ubicación.", "info");
     });
 
-    document.getElementById('form-alta-estacionamiento').addEventListener('submit', async (e) => {
+    document.getElementById('form-alta-estacionamiento').addEventListener('submit', (e) => {
         e.preventDefault();
-        const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!sede) return;
+
         sede.nombre = document.getElementById('est-nombre').value.trim();
         sede.direccion = document.getElementById('est-direccion').value.trim();
         sede.tarifaHora = Number(document.getElementById('est-tarifa').value) || 25;
@@ -558,7 +520,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sede.lat = Number(document.getElementById('est-lat').value) || 19.8454;
         sede.lng = Number(document.getElementById('est-lng').value) || -90.5358;
 
-        // Asegurar que existan los pisos solicitados
         if (!sede.pisos) sede.pisos = {};
         for (let i = 1; i <= sede.niveles; i++) {
             if (!sede.pisos[String(i)]) {
@@ -566,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     columnas: 5,
                     filas: 4,
                     celdas: Array.from({ length: 20 }, (_, idx) => ({
-                        tipo: idx < 5 ? 'cajon' : 'calle',
+                        tipo: idx < 10 ? 'cajon' : 'calle',
                         codigo: `P${i}-${idx + 1}`,
                         sensorFisico: ''
                     }))
@@ -574,11 +535,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        await set(ref(db, `estacionamientos_red/${estacionamientoActivoId}`), sede);
-        showToast("¡Estacionamiento y ubicación guardados en la nube!", "success");
+        guardarCatalogoEnNubeYLocal();
+        actualizarSelectorSedes();
+        renderizarPillsMonitor();
+        dibujarMapaAdmin();
+        renderizarConstructor();
+        showToast("¡Datos y ubicación guardados exitosamente!", "success");
     });
 
-    // --- 4. PESTAÑA 3: CONSTRUCTOR DE ESTACIONAMIENTO (MODO JUEGO) ---
+    // --- PESTAÑA 3: CONSTRUCTOR DE ESTACIONAMIENTO (MODO JUEGO) ---
     document.querySelectorAll('.tool-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('activo'));
@@ -593,7 +558,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pisosTabs = document.getElementById('builder-pisos-tabs');
         if (!sede || !gridContainer || !pisosTabs) return;
 
-        // Botones de pisos
         pisosTabs.innerHTML = '';
         for (let p = 1; p <= (Number(sede.niveles) || 1); p++) {
             const btn = document.createElement('button');
@@ -627,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let contenido = '';
             if (celda.tipo === 'cajon') {
-                contenido = `<strong>🚗 ${celda.codigo || 'C' + (idx + 1)}</strong><small style="font-size:0.68rem;">${celda.sensorFisico || 'Virtual'}</small>`;
+                contenido = `<strong>🚗 ${celda.codigo || 'C' + (idx + 1)}</strong><small style="font-size:0.68rem;">${celda.sensorFisico ? '🔌 ' + celda.sensorFisico : '☁️ Virtual'}</small>`;
             } else if (celda.tipo === 'discapacitado') {
                 contenido = `<strong>♿ ${celda.codigo || 'E' + (idx + 1)}</strong><small style="font-size:0.68rem;">Preferente</small>`;
             } else if (celda.tipo === 'elevador') {
@@ -641,20 +605,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (celda.tipo === 'calle') {
                 contenido = `<span>🛣️ Carril</span>`;
             } else {
-                contenido = `<span style="color:#3f3f46; font-size:0.75rem;">Vacío</span>`;
+                contenido = `<span style="color:#52525b; font-size:0.75rem;">Vacío</span>`;
             }
 
             div.innerHTML = contenido;
-
-            div.addEventListener('click', () => {
-                aplicarHerramientaEnCelda(pisoObj, idx);
-            });
-
+            div.addEventListener('click', () => aplicarHerramientaEnCelda(pisoObj, idx));
             gridContainer.appendChild(div);
         });
 
         document.getElementById('resumen-builder-stats').textContent =
-            `Nivel ${pisoBuilderActual}: ${totalCajones} cajones en este piso | ${totalFisicos} vinculados a sensores físicos ESP32 | ${totalDisc} para discapacitados`;
+            `Nivel ${pisoBuilderActual}: ${totalCajones} cajones en este piso | ${totalFisicos} con sensor físico ESP32 | ${totalDisc} para discapacitados`;
     }
 
     function aplicarHerramientaEnCelda(pisoObj, idx) {
@@ -719,17 +679,71 @@ document.addEventListener('DOMContentLoaded', () => {
         sede.pisos["1"] = crearEstacionamientoPorDefecto().pisos["1"];
         pisoBuilderActual = 1;
         renderizarConstructor();
+        dibujarMapaAdmin();
         showToast("Plantilla con los 6 sensores de la maqueta cargada", "info");
     });
 
-    document.getElementById('btn-guardar-plano').addEventListener('click', async () => {
-        const sede = catalogoEstacionamientos[estacionamientoActivoId];
-        if (!sede) return;
-        await set(ref(db, `estacionamientos_red/${estacionamientoActivoId}`), sede);
+    document.getElementById('btn-guardar-plano').addEventListener('click', () => {
+        guardarCatalogoEnNubeYLocal();
+        dibujarMapaAdmin();
         showToast("¡Plano del estacionamiento guardado y publicado en vivo!", "success");
     });
 
-    // --- 5. BOTONES DE PLUMA, CENTRO DE RESOLUCIONES E HISTORIAL ---
+    // --- RENDERIZADO INMEDIATO AL ABRIR LA PÁGINA ---
+    actualizarSelectorSedes();
+    cargarFormularioSedeActiva();
+    renderizarPillsMonitor();
+    dibujarMapaAdmin();
+    renderizarConstructor();
+
+    // --- ESCUCHA EN VIVO DE SENSORES Y TICKETS EN FIREBASE ---
+    onValue(ref(db, 'estacionamientos_red'), (snapshot) => {
+        const nube = snapshot.val();
+        if (nube && Object.keys(nube).length > 0) {
+            catalogoEstacionamientos = nube;
+            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(nube));
+            actualizarSelectorSedes();
+            cargarFormularioSedeActiva();
+            renderizarPillsMonitor();
+            dibujarMapaAdmin();
+            renderizarConstructor();
+        }
+    });
+
+    onValue(ref(db, 'tickets_activos'), (snapshot) => {
+        adminTicketsActivos = snapshot.val() || {};
+        dibujarMapaAdmin();
+    });
+
+    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
+        adminEstadoFisico = snapshot.val() || {};
+        for (let idTicket in adminTicketsActivos) {
+            const t = adminTicketsActivos[idTicket];
+            if (t.estado === 'en_uso' && !t.timestampIngresoFisico) {
+                const sensorId = t.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[t.cajon];
+                if (sensorId && String(adminEstadoFisico[sensorId] || '').trim().toLowerCase() === 'ocupado') {
+                    update(ref(db, `tickets_activos/${idTicket}`), { timestampIngresoFisico: Date.now() });
+                }
+            }
+        }
+        dibujarMapaAdmin();
+    });
+
+    // Recolector automático de reservas expiradas
+    setInterval(() => {
+        const ahora = Date.now();
+        for (let id in adminTicketsActivos) {
+            const t = adminTicketsActivos[id];
+            if (t.estado === 'reservado' && t.timestampExpiracion && ahora > (t.timestampExpiracion + 60000)) {
+                set(ref(db, `tickets_activos/${id}`), null);
+                if (t.cajon) set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
+                showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
+                delete adminTicketsActivos[id];
+            }
+        }
+    }, 4000);
+
+    // --- BOTONES DE PLUMA, RESOLUCIONES E HISTORIAL ---
     document.getElementById('btn-emergencia-entrada').addEventListener('click', () => {
         set(ref(db, 'control_plumas/entrada'), 'abrir');
         showToast("Señal enviada: Abriendo pluma de Entrada", "info");
@@ -740,7 +754,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast("Señal enviada: Abriendo pluma de Salida", "info");
     });
 
-    // Centro de resoluciones
     const inputBusqueda = document.getElementById('input-busqueda-admin');
     const btnBuscar = document.getElementById('btn-buscar-admin');
     const divResultado = document.getElementById('resultado-busqueda');
@@ -766,7 +779,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let accionHTML = `<button class="btn-primario-azul" id="btn-abrir-res" style="width:100%; margin-top:10px;">🚧 Autorizar Pago en Efectivo y Abrir Pluma Salida</button>`;
         divResultado.innerHTML = `
             <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
                 <div>
@@ -778,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     Cajón: <strong>${encontrado.cajon}</strong>
                 </div>
             </div>
-            ${accionHTML}
+            <button class="btn-primario-azul" id="btn-abrir-res" style="width:100%; margin-top:10px;">🚧 Autorizar Pago en Efectivo y Abrir Pluma Salida</button>
         `;
 
         document.getElementById('btn-abrir-res').addEventListener('click', async () => {
@@ -791,7 +803,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Historial y Gráfica
     async function cargarHistorial() {
         try {
             const querySnapshot = await getDocs(collection(firestoreDB, "historial_tickets"));
