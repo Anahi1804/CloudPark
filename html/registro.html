@@ -3,33 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Registro - CloudPark</title>
+    <title>Registro - Parkil</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/auth.css">
+    <link rel="icon" type="image/png" href="../icono-parkil.png?v=3">
+    <style>
+        .selector-rol {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 0.5rem;
+        }
+        .opcion-rol {
+            background: #000000;
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            padding: 12px 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .opcion-rol.activo {
+            border-color: var(--spot-selected);
+            background: rgba(10, 132, 255, 0.12);
+            color: #FFFFFF;
+            box-shadow: 0 0 15px rgba(10, 132, 255, 0.25);
+        }
+    </style>
 </head>
 <body class="bg-app">
     <main class="mobile-container layout-auth">
-        
         <div class="contenedor-auth">
-            <header class="auth-header">
+            <header class="auth-header" style="margin-bottom: 2rem;">
                 <div class="logo-icon-grande">
-                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="84" height="84" viewBox="14 22 114 68" fill="none">
+                        <g stroke="#0A84FF" stroke-width="4.75" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                            <path d="M 38.0 66.50 L 25.5 66.50 Q 22.3 66.50 22.3 63.30 L 22.3 56.80 Q 22.3 54.00 25.0 53.46 L 41.35 50.78 L 50.2 38.4 Q 51.0 37.14 52.5 37.14 L 69.8 37.14 Q 71.3 37.14 72.1 38.4 L 80.97 50.78 L 97.2 53.46 Q 99.94 54.0 99.94 56.8 L 99.94 63.30 Q 99.94 66.50 96.74 66.50 L 90.0 66.50" />
+                            <circle cx="47.12" cy="66.50" r="6.22" fill="none" />
+                            <path d="M 65.5 72.72 H 79.5 A 4.2 4.2 0 0 0 79.5 64.3 A 5.4 5.4 0 0 0 69.2 62.5 A 4.6 4.6 0 0 0 65.5 72.72 Z" />
+                        </g>
+                        <g stroke="#FFE600" stroke-width="4.75" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                            <path d="M 105.5 72.72 L 109.0 65.50 L 117.5 65.50 L 121.0 72.72 Z" />
+                        </g>
+                    </svg>
                 </div>
-                <h1>Nueva Cuenta</h1>
-                <p>Únete a CloudPark</p>
+                <h1>Crear Cuenta</h1>
+                <p>Únete a la plataforma Parkil</p>
             </header>
 
             <form id="formulario-registro" class="form-dark" onsubmit="event.preventDefault();">
-                
                 <div class="campo-input-wrapper">
-                    <label for="reg-nombre">Nombre de Usuario</label>
+                    <label>Tipo de Cuenta</label>
+                    <div class="selector-rol">
+                        <div class="opcion-rol activo" id="rol-cliente" data-rol="cliente">🚗 Conductor</div>
+                        <div class="opcion-rol" id="rol-admin" data-rol="admin">🏢 Administrador</div>
+                    </div>
+                    <input type="hidden" id="reg-rol" value="cliente">
+                </div>
+
+                <div class="campo-input-wrapper">
+                    <label for="reg-nombre" id="label-nombre">Nombre Completo</label>
                     <div class="input-con-icono">
                         <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         <input type="text" id="reg-nombre" placeholder="Ej. Luna Keb" required>
                     </div>
                 </div>
 
-                <div class="campo-input-wrapper">
+                <div class="campo-input-wrapper" id="wrapper-placa">
                     <label for="reg-placa">Placa del Vehículo</label>
                     <div class="input-con-icono">
                         <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="2" ry="2"></rect><circle cx="7" cy="12" r="1"></circle><circle cx="17" cy="12" r="1"></circle></svg>
@@ -49,9 +92,7 @@
                     <label for="reg-password">Contraseña</label>
                     <div class="input-con-icono" style="position: relative;">
                         <svg class="icono-input" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        
                         <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" minlength="6" required>
-                        
                         <div id="btn-ojito-registro" style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted);">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </div>
@@ -68,7 +109,6 @@
                     ¿Ya tienes cuenta? <a href="../index.html" style="color: var(--spot-selected); text-decoration: none; font-weight: bold;">Inicia sesión aquí</a>
                 </p>
             </div>
-
         </div>
     </main>
 

@@ -1,6 +1,5 @@
 // js/acceso-entrada.js
-// 1. Importamos las herramientas, incluyendo 'get' para leer una sola vez y 'update' para actualizar datos
-import { db, ref, get, update, set } from './firebase-config.js';
+import { db, ref, get, update, set, PARKIL_CONFIG } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const inputCodigo = document.getElementById('codigo-input');
@@ -10,28 +9,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function mostrarEstado(mensaje, tipo) {
         textoMensaje.textContent = mensaje;
-        divMensaje.className = 'mensaje-terminal'; 
+        divMensaje.className = 'mensaje-terminal';
         divMensaje.classList.add(tipo);
         divMensaje.classList.remove('oculto');
     }
 
-    btnValidar.addEventListener('click', () => {
+    btnValidar.addEventListener('click', async () => {
         const codigoIngresado = inputCodigo.value.trim().toUpperCase();
-        
+
         if (codigoIngresado === "") {
             mostrarEstado("Por favor, ingresa tu código.", "error");
             return;
         }
 
-        // Bloqueamos la interfaz mientras consultamos a la nube
         btnValidar.disabled = true;
         btnValidar.textContent = "Consultando base de datos...";
 
-        // 2. Buscamos exactamente la carpeta de este código en Firebase
         const ticketRef = ref(db, 'tickets_activos/' + codigoIngresado);
-        
-        get(ticketRef).then((snapshot) => {
-            // Regla A: ¿El código existe en la base de datos?
+
+        try {
+            const snapshot = await get(ticketRef);
+
             if (!snapshot.exists()) {
                 mostrarEstado("Código no encontrado. Verifica tu ticket.", "error");
                 reactivarBoton();
@@ -39,46 +37,55 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const ticket = snapshot.val();
-            const ahora = new Date().getTime();
+            const ahora = Date.now();
 
-            // Regla B: ¿El ticket está en estado "reservado"? (evita que usen un código que ya se usó)
             if (ticket.estado !== "reservado") {
                 mostrarEstado("Este código ya fue utilizado o está inactivo.", "error");
                 reactivarBoton();
                 return;
             }
 
-            // Regla C: ¿Llegó tarde y el tiempo ya expiró?
             if (ahora > ticket.timestampExpiracion) {
-                // Sanción: Pasamos su ticket a estado 'vencido' para que ya no sirva
-                update(ticketRef, { estado: "vencido" });
-                // Quitamos el candado para que alguien más pueda comprar el lugar
-                set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
+                await update(ticketRef, { estado: "vencido" });
+                const rutaCandado = ticket.estacionamientoId
+                    ? `cajones_bloqueados_${ticket.estacionamientoId}/${ticket.cajon}`
+                    : `cajones_bloqueados/${ticket.cajon}`;
+                await set(ref(db, rutaCandado), null);
                 mostrarEstado("Tu tiempo de tolerancia ha expirado. Debes generar otra reserva.", "error");
                 reactivarBoton();
                 return;
             }
 
+            // Determinamos si este cajón tiene sensor físico de la maqueta o si es sensor virtual
+            const sensorHardware = ticket.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[ticket.cajon] || null;
+            const datosActualizacion = {
+                estado: "en_uso",
+                timestampEntradaPluma: ahora
+            };
 
-            // ESTADO 3: Cambiamos a "en_uso" y guardamos cuándo entró realmente para cobrarle después
-            update(ticketRef, { 
-                estado: "en_uso"
-            }).then(() => {
-                mostrarEstado(`¡Código Válido!\nCajón asignado: ${ticket.cajon}.\nAvanza, abriendo pluma...`, "exito");
-                
-                // 🦾 ¡LA MAGIA: Mandamos la orden al motor de ENTRADA!
-                set(ref(db, 'control_plumas/entrada'), 'abrir');
+            // Si es un cajón virtual (sin sensor físico asignado), iniciamos el cronómetro al cruzar la pluma
+            if (!sensorHardware) {
+                datosActualizacion.timestampIngresoFisico = ahora;
+            } else {
+                // Si el sensor físico ya estaba ocupado al validar, también iniciamos de inmediato
+                const snapSensor = await get(ref(db, `estacionamiento_actual/${sensorHardware}`));
+                if (snapSensor.exists() && String(snapSensor.val()).trim().toLowerCase() === "ocupado") {
+                    datosActualizacion.timestampIngresoFisico = ahora;
+                }
+            }
 
-                // Limpiamos el input
-                inputCodigo.value = "";
-                reactivarBoton();
-            });
+            await update(ticketRef, datosActualizacion);
 
-        }).catch((error) => {
+            mostrarEstado(`¡Código Válido!\nCajón asignado: ${ticket.cajon}.\nAvanza, abriendo pluma...`, "exito");
+            await set(ref(db, 'control_plumas/entrada'), 'abrir');
+
+            inputCodigo.value = "";
+            reactivarBoton();
+        } catch (error) {
             console.error("Error al conectar con Firebase:", error);
             mostrarEstado("Error de conexión. Intenta de nuevo.", "error");
             reactivarBoton();
-        });
+        }
     });
 
     function reactivarBoton() {

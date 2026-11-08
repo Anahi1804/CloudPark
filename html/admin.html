@@ -3,97 +3,318 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control - CloudPark</title>
+    <title>Panel de Control - Parkil Admin</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/admin.css">
+    <link rel="icon" type="image/png" href="../icono-parkil.png?v=3">
+    <!-- Chart.js para gráficas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet CSS & JS para el Mapa de Estacionamientos -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-app text-main">
 
     <div class="admin-container">
+        <!-- HEADER SUPERIOR -->
         <header class="admin-header">
-            <div>
-                <h1 style="margin: 0;">Panel de Control</h1>
-                <p style="color: var(--text-muted); margin-top: 5px;">Modo Administrador</p>
+            <div class="brand-admin">
+                <div class="logo-admin-svg" id="logo-header-admin"></div>
+                <div>
+                    <h1>Parkil Studio & Control</h1>
+                    <p id="subtitulo-sede">Cargando estacionamiento...</p>
+                </div>
             </div>
-            
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
-                <button id="btn-emergencia-entrada" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">Abrir Entrada</button>
-                <button id="btn-emergencia-salida" style="background: linear-gradient(135deg, #FF453A, #8A0000); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 69, 58, 0.3);">Abrir Salida</button>
-                <a href="dashboard.html" class="btn-neon" style="text-decoration: none; padding: 10px 20px; display: flex; align-items: center;">Salir</a>
+
+            <div class="acciones-header">
+                <select id="selector-estacionamiento-activo" class="select-sede" title="Cambiar estacionamiento activo"></select>
+                <button id="btn-emergencia-entrada" class="btn-pluma">🚧 Abrir Entrada</button>
+                <button id="btn-emergencia-salida" class="btn-pluma">🏁 Abrir Salida</button>
+                <a href="dashboard.html" class="btn-neon-outline">Vista Conductor</a>
+                <button id="btn-cerrar-sesion-admin" class="btn-neon-outline" style="border-color: var(--danger-neon); color: var(--danger-neon);">Salir</button>
             </div>
         </header>
 
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 2rem;">
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <div class="stats-card">
-                    <h3>Ingresos Totales</h3>
-                    <div class="numero" id="stat-ingresos">$0.00</div>
-                </div>
-                <div class="stats-card">
-                    <h3>Tickets Liquidados</h3>
-                    <div class="numero" id="stat-tickets" style="color: #FFFFFF;">0</div>
-                </div>
-            </div>
-            <div class="stats-card" style="display: flex; align-items: center; justify-content: center; position: relative;">
-                <canvas id="graficaPaquetes" style="max-height: 200px; width: 100%;"></canvas>
-            </div>
-        </div>
+        <!-- NAVEGACIÓN POR PESTAÑAS (TABS) -->
+        <nav class="admin-tabs">
+            <button class="tab-btn activo" data-tab="tab-operacion">📊 Operación en Vivo</button>
+            <button class="tab-btn" data-tab="tab-alta-mapa">📍 Alta y Ubicación (Mapa)</button>
+            <button class="tab-btn" data-tab="tab-constructor">🏗️ Constructor de Niveles (Juego)</button>
+        </nav>
 
-        <div class="admin-grid">
-            <section>
-                <h2>Monitor de Cajones</h2>
-                <div class="stats-card" style="margin-top: 1rem; padding: 1.5rem;">
-                    <div id="admin-mapa-container">
-                        <p style="color: var(--text-muted); font-size: 0.9rem;">Sincronizando sensores con la nube...</p>
+        <!-- =========================================================
+             PESTAÑA 1: OPERACIÓN EN VIVO (SENSORES, PLUMAS Y CAJA)
+        ========================================================== -->
+        <div id="tab-operacion" class="tab-content activo">
+            <div class="top-stats-grid">
+                <div class="stats-column">
+                    <div class="stats-card">
+                        <h3>Ingresos Totales</h3>
+                        <div class="numero" id="stat-ingresos">$0.00</div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>Tickets Liquidados</h3>
+                        <div class="numero" id="stat-tickets" style="color: #FFFFFF;">0</div>
                     </div>
                 </div>
-            </section>
-
-            <section>
-                <h2>Inspección de Vehículo</h2>
-                <div id="info-vehiculo" class="stats-card" style="margin-top: 1rem; text-align: left; min-height: 180px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-                    <p style="color: var(--text-muted); text-align: center; margin: 0;">Haz clic en un cajón para ver datos.</p>
+                <div class="stats-card chart-card">
+                    <canvas id="graficaPaquetes" style="max-height: 210px; width: 100%;"></canvas>
                 </div>
-            </section>
+            </div>
 
-            <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 2rem; border-top: 3px solid var(--spot-selected);">
-                <h3 class="titulo-seccion">Centro de Resoluciones</h3>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234)" style="flex: 1; min-width: 250px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; text-transform: uppercase;">
-                    <button id="btn-buscar-admin" class="btn-neon" style="padding: 12px 24px; border-radius: 10px;">Buscar Cliente</button>
+            <div class="admin-grid">
+                <!-- Monitor en Tiempo Real Multi-Piso -->
+                <section>
+                    <div class="seccion-header-inline">
+                        <h2>Monitor de Cajones en Tiempo Real</h2>
+                        <div id="pisos-monitor-tabs" class="pisos-pills"></div>
+                    </div>
+                    <div class="stats-card" style="margin-top: 0.8rem; padding: 1.5rem;">
+                        <div class="leyenda-mini">
+                            <span><i class="dot libre"></i> Libre</span>
+                            <span><i class="dot reservado"></i> Reservado</span>
+                            <span><i class="dot transito"></i> En Tránsito</span>
+                            <span><i class="dot ocupado"></i> Ocupado</span>
+                            <span><i class="dot disc"></i> ♿ Discapacitados</span>
+                        </div>
+                        <div id="admin-mapa-container">
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">Sincronizando sensores con la nube...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Inspección de Cajón / Vehículo -->
+                <section>
+                    <h2>Inspección de Cajón y Sensor</h2>
+                    <div id="info-vehiculo" class="stats-card" style="margin-top: 0.8rem; text-align: left; min-height: 240px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                        <p style="color: var(--text-muted); text-align: center; margin: 0;">Haz clic en cualquier cajón del plano para inspeccionar su estado, ver al cliente o simular un sensor.</p>
+                    </div>
+                </section>
+
+                <!-- Centro de Resoluciones -->
+                <section class="tarjeta-oscura" style="grid-column: 1 / -1; margin-bottom: 1rem; border-top: 3px solid var(--spot-selected);">
+                    <h3 class="titulo-seccion">Centro de Resoluciones y Cobro en Caseta</h3>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="input-busqueda-admin" placeholder="Ingresa la PLACA o el CÓDIGO (Ej. YZA-1234 o PARK-1234)" class="input-dark" style="flex: 1; min-width: 250px; text-transform: uppercase;">
+                        <button id="btn-buscar-admin" class="btn-primario-azul">Buscar Cliente</button>
+                    </div>
+                    <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.04); padding: 15px; border-radius: 12px; border: 1px dashed var(--border-dark);"></div>
+                </section>
+            </div>
+
+            <!-- Historial de Pagos -->
+            <section style="margin-top: 2rem;">
+                <div class="seccion-header-inline" style="border-bottom: 1px solid var(--border-dark); margin-bottom: 1rem; padding-bottom: 10px;">
+                    <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos</h2>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa o cliente..." class="input-dark" style="width: 240px;">
+                        <button id="btn-exportar-csv" class="btn-csv">📥 Exportar CSV</button>
+                    </div>
                 </div>
-                <div id="resultado-busqueda" class="oculto" style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed var(--border-dark);"></div>
+                
+                <div class="tabla-container">
+                    <table class="tabla-historial" style="min-width: 900px;">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Cliente / Placa</th>
+                                <th>Estacionamiento / Cajón</th>
+                                <th>Tiempo</th>
+                                <th>Liquidado</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-body-historial">
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando registros...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </div>
 
-        <section style="margin-top: 3rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-dark); margin-bottom: 1rem; padding-bottom: 10px; flex-wrap: wrap; gap: 10px;">
-                <h2 style="border: none; margin: 0; padding: 0;">Registro Histórico de Pagos</h2>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="filtro-historial" placeholder="🔍 Filtrar por placa..." style="padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-dark); color: white; -width: 200px;">
-                    <button id="btn-exportar-csv" style="background: #1e8e3e; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">📥 Exportar CSV</button>
-                </div>
+        <!-- =========================================================
+             PESTAÑA 2: ALTA DE ESTACIONAMIENTO Y UBICACIÓN EN MAPA
+        ========================================================== -->
+        <div id="tab-alta-mapa" class="tab-content oculto">
+            <div class="admin-grid">
+                <section class="stats-card" style="text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 style="margin: 0; border: none;">Datos del Estacionamiento</h2>
+                        <button type="button" id="btn-nuevo-estacionamiento" class="btn-neon-outline" style="font-size: 0.8rem; padding: 6px 12px;">+ Crear Nueva Sucursal</button>
+                    </div>
+                    <form id="form-alta-estacionamiento" class="form-admin-grid">
+                        <div>
+                            <label>Nombre Comercial del Estacionamiento</label>
+                            <input type="text" id="est-nombre" class="input-dark" placeholder="Ej. Parkil Plaza Centro Campeche" required>
+                        </div>
+                        <div>
+                            <label>Dirección Física / Referencia</label>
+                            <input type="text" id="est-direccion" class="input-dark" placeholder="Ej. Calle 10 #245, Centro Histórico, Campeche" required>
+                        </div>
+                        <div class="fila-2-col">
+                            <div>
+                                <label>Tarifa por Hora ($ MXN)</label>
+                                <input type="number" id="est-tarifa" class="input-dark" value="25" min="5" step="1" required>
+                            </div>
+                            <div>
+                                <label>Número de Niveles / Pisos</label>
+                                <select id="est-niveles" class="input-dark">
+                                    <option value="1">1 Nivel (Planta Baja)</option>
+                                    <option value="2">2 Niveles (Piso 1 y Piso 2)</option>
+                                    <option value="3">3 Niveles (Piso 1, 2 y 3)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fila-2-col">
+                            <div>
+                                <label>Latitud (Mapa)</label>
+                                <input type="number" id="est-lat" class="input-dark" step="any" readonly required>
+                            </div>
+                            <div>
+                                <label>Longitud (Mapa)</label>
+                                <input type="number" id="est-lng" class="input-dark" step="any" readonly required>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.5rem;">
+                            <button type="submit" class="btn-primario-azul" style="width: 100%; padding: 14px;">💾 Guardar Datos y Ubicación en la Nube</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="stats-card" style="text-align: left; display: flex; flex-direction: column;">
+                    <h2 style="margin-top: 0;">Ubicación en el Mapa (Haz clic donde está tu local)</h2>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 10px;">
+                        Haz clic en cualquier punto de la ciudad para colocar el pin de tu estacionamiento. Los conductores lo verán en su mapa en tiempo real.
+                    </p>
+                    <div id="mapa-admin-leaflet" style="flex: 1; min-height: 360px; width: 100%; border-radius: 12px; border: 1px solid var(--border-dark);"></div>
+                </section>
             </div>
-            
-            <div style="width: 100%; overflow-x: auto; background: var(--surface-dark); border-radius: 12px; border: 1px solid var(--border-dark);">
-                <table class="tabla-historial" style="min-width: 900px;">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Cliente / Placa</th>
-                            <th>Cajón</th>
-                            <th>Tiempo Total</th>
-                            <th>Liquidado</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-body-historial">
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando registros...</td></tr>
-                    </tbody>
-                </table>
+        </div>
+
+        <!-- =========================================================
+             PESTAÑA 3: CONSTRUCTOR DE ESTACIONAMIENTO (MODO JUEGO)
+        ========================================================== -->
+        <div id="tab-constructor" class="tab-content oculto">
+            <div class="builder-layout">
+                <!-- Paleta de Herramientas Izquierda -->
+                <aside class="stats-card builder-sidebar" style="text-align: left;">
+                    <h2 style="margin-top: 0;">1. Elige una Herramienta</h2>
+                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem;">
+                        Selecciona un elemento y haz clic en las celdas de la derecha para construir tu plano.
+                    </p>
+
+                    <div class="paleta-herramientas">
+                        <button type="button" class="tool-btn activo" data-tool="cajon">
+                            <span class="tool-icon">🚗</span>
+                            <div>
+                                <strong>Cajón Estándar</strong>
+                                <small>Espacio con tope inteligente</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="discapacitado">
+                            <span class="tool-icon">♿</span>
+                            <div>
+                                <strong>Cajón Discapacitados</strong>
+                                <small>Acceso preferente exclusivo</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="elevador">
+                            <span class="tool-icon">🛗</span>
+                            <div>
+                                <strong>Elevador</strong>
+                                <small>Punto de referencia peatonal</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="escalera">
+                            <span class="tool-icon">🪜</span>
+                            <div>
+                                <strong>Escaleras</strong>
+                                <small>Conexión entre niveles</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="entrada">
+                            <span class="tool-icon">🚧</span>
+                            <div>
+                                <strong>Entrada (Pluma)</strong>
+                                <small>Acceso vehicular con QR</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="salida">
+                            <span class="tool-icon">🏁</span>
+                            <div>
+                                <strong>Salida (Pluma)</strong>
+                                <small>Verificación y salida</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="calle">
+                            <span class="tool-icon">🛣️</span>
+                            <div>
+                                <strong>Pasillo / Vialidad</strong>
+                                <small>Carril de circulación</small>
+                            </div>
+                        </button>
+                        <button type="button" class="tool-btn" data-tool="vacio">
+                            <span class="tool-icon">🧹</span>
+                            <div>
+                                <strong>Borrador / Vacío</strong>
+                                <small>Limpiar celda seleccionada</small>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Inspector de Sensor Físico vs Virtual -->
+                    <div id="inspector-celda-builder" class="inspector-builder oculto">
+                        <h3 style="color: #fff; font-size: 0.9rem; margin-bottom: 8px;">⚡ Configurar Cajón <span id="lbl-cajon-edit" style="color: var(--spot-selected);">A1</span></h3>
+                        <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Código del Cajón:</label>
+                        <input type="text" id="input-codigo-cajon" class="input-dark" style="margin-bottom: 10px; padding: 8px;" maxlength="6">
+
+                        <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Vincular a Sensor de Maqueta (ESP32):</label>
+                        <select id="select-sensor-fisico" class="input-dark" style="padding: 8px;">
+                            <option value="">☁️ Sensor Virtual (Simulado en Nube)</option>
+                            <option value="cajon_1">🔌 Sensor Físico 1 (cajon_1 - Maqueta)</option>
+                            <option value="cajon_2">🔌 Sensor Físico 2 (cajon_2 - Maqueta)</option>
+                            <option value="cajon_3">🔌 Sensor Físico 3 (cajon_3 - Maqueta)</option>
+                            <option value="cajon_4">🔌 Sensor Físico 4 (cajon_4 - Maqueta)</option>
+                            <option value="cajon_5">🔌 Sensor Físico 5 (cajon_5 - Maqueta)</option>
+                            <option value="cajon_6">🔌 Sensor Físico 6 (cajon_6 - Maqueta)</option>
+                        </select>
+                        <small style="display: block; color: var(--text-muted); font-size: 0.72rem; margin-top: 6px;">
+                            Los cajones vinculados a <b>cajon_1..6</b> responden en vivo a tu maqueta física. Los demás operan mediante sensores virtuales.
+                        </small>
+                    </div>
+                </aside>
+
+                <!-- Lienzo del Constructor Derecha -->
+                <section class="stats-card builder-canvas-area">
+                    <div class="builder-top-bar">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <h2 style="margin: 0; border: none;">2. Diseña el Plano del Nivel:</h2>
+                            <div id="builder-pisos-tabs" class="pisos-pills"></div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Tamaño:</label>
+                            <select id="select-grid-size" class="input-dark" style="padding: 6px 10px; width: auto;">
+                                <option value="3x3">Compacto (3x3 - Maqueta 6 cajones)</option>
+                                <option value="5x4" selected>Mediano (5x4)</option>
+                                <option value="6x5">Grande (6x5)</option>
+                                <option value="8x5">Plaza Comercial (8x5)</option>
+                            </select>
+                            <button type="button" id="btn-plantilla-maqueta" class="btn-neon-outline" style="padding: 6px 12px; font-size: 0.8rem;">🔄 Cargar Plantilla Maqueta</button>
+                            <button type="button" id="btn-guardar-plano" class="btn-primario-azul" style="padding: 8px 16px;">💾 Guardar Plano del Estacionamiento</button>
+                        </div>
+                    </div>
+
+                    <div class="resumen-builder-bar" id="resumen-builder-stats">
+                        Total cajones: 0 | Con sensor físico: 0 | Discapacitados: 0
+                    </div>
+
+                    <!-- Cuadrícula Interactiva -->
+                    <div id="grid-builder-container" class="grid-builder"></div>
+                </section>
             </div>
-        </section>
+        </div>
+
     </div>
 
     <script type="module" src="../js/admin.js"></script>

@@ -1,12 +1,27 @@
-// js/admin.js
-import { auth, firestoreDB, db, onAuthStateChanged, collection, getDocs, ref, onValue, set, doc, setDoc, update } from './firebase-config.js';
+// js/admin.js - Suite Administrativa, Mapa y Constructor 2D de Parkil
+import {
+    auth, firestoreDB, db, PARKIL_CONFIG, obtenerLogoParkilSVG,
+    onAuthStateChanged, signOut, collection, getDocs,
+    ref, onValue, set, get, doc, setDoc, update
+} from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Insertar el nuevo logo en el header
+    const logoContainer = document.getElementById('logo-header-admin');
+    if (logoContainer) logoContainer.innerHTML = obtenerLogoParkilSVG(48);
+
     onAuthStateChanged(auth, (user) => {
         if (!user) window.location.href = '../index.html';
     });
 
-    // --- FUNCIÓN DE NOTIFICACIONES ELEGANTES (TOAST) ---
+    const btnCerrarSesion = document.getElementById('btn-cerrar-sesion-admin');
+    if (btnCerrarSesion) {
+        btnCerrarSesion.addEventListener('click', () => {
+            signOut(auth).then(() => window.location.href = '../index.html');
+        });
+    }
+
+    // --- NOTIFICACIONES TOAST CON ICONOS CORREGIDOS ---
     function showToast(mensaje, tipo = 'info') {
         let container = document.getElementById('toast-container');
         if (!container) {
@@ -14,49 +29,780 @@ document.addEventListener('DOMContentLoaded', () => {
             container.id = 'toast-container';
             document.body.appendChild(container);
         }
-        
-        let icono = '';
-        if(tipo === 'success') icono = '✅';
-        if(tipo === 'error') icono = '❌';
-        if(tipo === 'info') icono = 'ℹ️';
-
+        const iconos = { success: '✅', error: '⚠️', info: '📡' };
         const toast = document.createElement('div');
         toast.className = `toast ${tipo}`;
-        toast.innerHTML = `<span>${icono}</span> <span>${mensaje}</span>`;
+        toast.innerHTML = `<span>${iconos[tipo] || 'ℹ️'}</span> <span>${mensaje}</span>`;
         container.appendChild(toast);
-        
+
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => {
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 400);
-        }, 4000);
+        }, 3800);
     }
 
-    const tablaBody = document.getElementById('tabla-body-historial');
-    const statIngresos = document.getElementById('stat-ingresos');
-    const statTickets = document.getElementById('stat-tickets');
-    const mapaContainer = document.getElementById('admin-mapa-container');
-    const infoVehiculo = document.getElementById('info-vehiculo');
-    const filtroHistorial = document.getElementById('filtro-historial');
-    const btnExportar = document.getElementById('btn-exportar-csv');
+    // --- NAVEGACIÓN DE PESTAÑAS (TABS) ---
+    let mapaLeaflet = null;
+    let marcadorLeaflet = null;
 
-    let historialGlobal = []; 
-    let chartInstancia = null; 
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('oculto'));
 
-    // --- CARGAR HISTORIAL Y GRÁFICAS ---
+            btn.classList.add('activo');
+            const targetId = btn.getAttribute('data-tab');
+            document.getElementById(targetId).classList.remove('oculto');
+
+            if (targetId === 'tab-alta-mapa') {
+                setTimeout(() => inicializarMapaLeaflet(), 150);
+            }
+            if (targetId === 'tab-constructor') {
+                renderizarConstructor();
+            }
+        });
+    });
+
+    // --- ESTADO GLOBAL DEL ADMINISTRADOR ---
+    let catalogoEstacionamientos = {};
+    let estacionamientoActivoId = localStorage.getItem('adminEstacionamientoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+    let pisoMonitorActual = 1;
+    let pisoBuilderActual = 1;
+    let herramientaActual = 'cajon';
+    let celdaEditandoIndex = null;
+
+    let adminTicketsActivos = {};
+    let adminEstadoFisico = {}; // Sensores reales ESP32 (cajon_1..6)
+    let adminSensoresVirtuales = {}; // Sensores simulados para estacionamientos grandes
+    let historialGlobal = [];
+    let chartInstancia = null;
+
+    // --- PLANTILLA INICIAL POR DEFECTO (Conecta los 6 sensores de la maqueta + accesibilidad) ---
+    function crearEstacionamientoPorDefecto() {
+        return {
+            id: PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID,
+            nombre: "Parkil Matriz Centro Histórico (Maqueta IoT)",
+            direccion: "Calle 10 #245, Centro Histórico, San Francisco de Campeche",
+            tarifaHora: 25,
+            niveles: 2,
+            lat: 19.8454,
+            lng: -90.5358,
+            pisos: {
+                "1": {
+                    columnas: 5,
+                    filas: 4,
+                    celdas: [
+                        { tipo: "entrada", etiqueta: "ENTRADA" },
+                        { tipo: "calle", etiqueta: "→" },
+                        { tipo: "calle", etiqueta: "→" },
+                        { tipo: "elevador", etiqueta: "ELEVADOR" },
+                        { tipo: "escalera", etiqueta: "ESCALERA" },
+
+                        { tipo: "cajon", codigo: "A1", sensorFisico: "cajon_1" },
+                        { tipo: "cajon", codigo: "A2", sensorFisico: "cajon_2" },
+                        { tipo: "cajon", codigo: "A3", sensorFisico: "cajon_3" },
+                        { tipo: "discapacitado", codigo: "E1", sensorFisico: "" },
+                        { tipo: "calle", etiqueta: "↓" },
+
+                        { tipo: "cajon", codigo: "B1", sensorFisico: "cajon_4" },
+                        { tipo: "cajon", codigo: "B2", sensorFisico: "cajon_5" },
+                        { tipo: "cajon", codigo: "B3", sensorFisico: "cajon_6" },
+                        { tipo: "discapacitado", codigo: "E2", sensorFisico: "" },
+                        { tipo: "calle", etiqueta: "↓" },
+
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "salida", etiqueta: "SALIDA" }
+                    ]
+                },
+                "2": {
+                    columnas: 5,
+                    filas: 4,
+                    celdas: [
+                        { tipo: "calle", etiqueta: "RAMPA ↑" },
+                        { tipo: "calle", etiqueta: "→" },
+                        { tipo: "calle", etiqueta: "→" },
+                        { tipo: "elevador", etiqueta: "ELEVADOR" },
+                        { tipo: "escalera", etiqueta: "ESCALERA" },
+
+                        { tipo: "cajon", codigo: "C1", sensorFisico: "" },
+                        { tipo: "cajon", codigo: "C2", sensorFisico: "" },
+                        { tipo: "cajon", codigo: "C3", sensorFisico: "" },
+                        { tipo: "discapacitado", codigo: "C4", sensorFisico: "" },
+                        { tipo: "calle", etiqueta: "↓" },
+
+                        { tipo: "cajon", codigo: "D1", sensorFisico: "" },
+                        { tipo: "cajon", codigo: "D2", sensorFisico: "" },
+                        { tipo: "cajon", codigo: "D3", sensorFisico: "" },
+                        { tipo: "cajon", codigo: "D4", sensorFisico: "" },
+                        { tipo: "calle", etiqueta: "↓" },
+
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "←" },
+                        { tipo: "calle", etiqueta: "RAMPA ↓" }
+                    ]
+                }
+            }
+        };
+    }
+
+    // --- 1. SINCRONIZAR CATÁLOGO DE ESTACIONAMIENTOS EN FIREBASE ---
+    const redRef = ref(db, 'estacionamientos_red');
+    onValue(redRef, async (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+            const def = crearEstacionamientoPorDefecto();
+            // También creamos una segunda sucursal simulada en Campeche para que el mapa del conductor luzca increíble
+            const suc2 = {
+                id: "parkil_galerias_campeche",
+                nombre: "Parkil Plaza Galerías Ah-Kim-Pech",
+                direccion: "Av. Pedro Sainz de Baranda, Ah-Kim-Pech, Campeche",
+                tarifaHora: 30,
+                niveles: 1,
+                lat: 19.8528,
+                lng: -90.5295,
+                pisos: {
+                    "1": {
+                        columnas: 5,
+                        filas: 4,
+                        celdas: crearEstacionamientoPorDefecto().pisos["1"].celdas.map(c => ({ ...c, sensorFisico: "" }))
+                    }
+                }
+            };
+            await set(ref(db, `estacionamientos_red/${def.id}`), def);
+            await set(ref(db, `estacionamientos_red/${suc2.id}`), suc2);
+            return;
+        }
+
+        catalogoEstacionamientos = data;
+        if (!catalogoEstacionamientos[estacionamientoActivoId]) {
+            estacionamientoActivoId = Object.keys(catalogoEstacionamientos)[0];
+        }
+        actualizarSelectorSedes();
+        cargarFormularioSedeActiva();
+        renderizarPillsMonitor();
+        dibujarMapaAdmin();
+        renderizarConstructor();
+    });
+
+    const selectorSede = document.getElementById('selector-estacionamiento-activo');
+    function actualizarSelectorSedes() {
+        selectorSede.innerHTML = '';
+        Object.values(catalogoEstacionamientos).forEach(est => {
+            const opt = document.createElement('option');
+            opt.value = est.id;
+            opt.textContent = `🏢 ${est.nombre}`;
+            if (est.id === estacionamientoActivoId) opt.selected = true;
+            selectorSede.appendChild(opt);
+        });
+        const actual = catalogoEstacionamientos[estacionamientoActivoId];
+        if (actual) {
+            document.getElementById('subtitulo-sede').textContent = `${actual.nombre} • $${actual.tarifaHora}/hr • ${actual.niveles} Nivel(es)`;
+        }
+    }
+
+    selectorSede.addEventListener('change', () => {
+        estacionamientoActivoId = selectorSede.value;
+        localStorage.setItem('adminEstacionamientoId', estacionamientoActivoId);
+        pisoMonitorActual = 1;
+        pisoBuilderActual = 1;
+        actualizarSelectorSedes();
+        cargarFormularioSedeActiva();
+        renderizarPillsMonitor();
+        dibujarMapaAdmin();
+        renderizarConstructor();
+        showToast("Cambiaste de estacionamiento activo", "info");
+    });
+
+    // --- 2. MONITOR EN TIEMPO REAL (SENSORES FÍSICOS + VIRTUALES + TICKETS) ---
+    onValue(ref(db, 'tickets_activos'), (snapshot) => {
+        adminTicketsActivos = snapshot.val() || {};
+        dibujarMapaAdmin();
+    });
+
+    onValue(ref(db, 'sensores_virtuales'), (snapshot) => {
+        adminSensoresVirtuales = snapshot.val() || {};
+        dibujarMapaAdmin();
+    });
+
+    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
+        adminEstadoFisico = snapshot.val() || {};
+
+        // Auto Check-In: si un sensor físico se ocupa, iniciamos el timestampIngresoFisico del ticket activo
+        for (let idTicket in adminTicketsActivos) {
+            const t = adminTicketsActivos[idTicket];
+            if (t.estado === 'en_uso' && !t.timestampIngresoFisico) {
+                const sensorId = t.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[t.cajon];
+                if (sensorId && String(adminEstadoFisico[sensorId] || '').trim().toLowerCase() === 'ocupado') {
+                    update(ref(db, `tickets_activos/${idTicket}`), {
+                        timestampIngresoFisico: Date.now()
+                    });
+                }
+            }
+        }
+        dibujarMapaAdmin();
+    });
+
+    // Recolector automático de reservas expiradas (reemplaza a Railway)
+    setInterval(() => {
+        const ahora = Date.now();
+        for (let id in adminTicketsActivos) {
+            const t = adminTicketsActivos[id];
+            if (t.estado === 'reservado' && t.timestampExpiracion) {
+                if (ahora > (t.timestampExpiracion + 60000)) {
+                    set(ref(db, `tickets_activos/${id}`), null);
+                    if (t.cajon) {
+                        set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
+                        if (t.estacionamientoId) {
+                            set(ref(db, `cajones_bloqueados_${t.estacionamientoId}/${t.cajon}`), null);
+                        }
+                    }
+                    showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
+                    delete adminTicketsActivos[id];
+                }
+            }
+        }
+    }, 4000);
+
+    function renderizarPillsMonitor() {
+        const contenedor = document.getElementById('pisos-monitor-tabs');
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!contenedor || !sede) return;
+
+        contenedor.innerHTML = '';
+        const totalNiveles = Number(sede.niveles) || 1;
+        for (let p = 1; p <= totalNiveles; p++) {
+            const btn = document.createElement('button');
+            btn.className = `piso-pill ${p === pisoMonitorActual ? 'activo' : ''}`;
+            btn.textContent = `Piso ${p}`;
+            btn.addEventListener('click', () => {
+                pisoMonitorActual = p;
+                renderizarPillsMonitor();
+                dibujarMapaAdmin();
+            });
+            contenedor.appendChild(btn);
+        }
+    }
+
+    function obtenerEstadoSensorCajon(celda) {
+        if (celda.sensorFisico) {
+            return String(adminEstadoFisico[celda.sensorFisico] || 'libre').trim().toLowerCase();
+        }
+        const virtSede = adminSensoresVirtuales[estacionamientoActivoId] || {};
+        return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();
+    }
+
+    function dibujarMapaAdmin() {
+        const mapaContainer = document.getElementById('admin-mapa-container');
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!mapaContainer || !sede || !sede.pisos) return;
+
+        const datosPiso = sede.pisos[String(pisoMonitorActual)] || sede.pisos["1"];
+        if (!datosPiso) return;
+
+        // Mapear tickets activos de esta sede
+        const infoPorCajon = {};
+        for (let id in adminTicketsActivos) {
+            const t = adminTicketsActivos[id];
+            const coincideSede = !t.estacionamientoId || t.estacionamientoId === estacionamientoActivoId;
+            if (coincideSede) {
+                infoPorCajon[t.cajon] = { id, ...t };
+            }
+        }
+
+        let html = `<div style="display: grid; grid-template-columns: repeat(${datosPiso.columnas}, minmax(72px, 1fr)); gap: 10px;">`;
+
+        datosPiso.celdas.forEach((celda) => {
+            if (celda.tipo === 'vacio') {
+                html += `<div style="min-height: 68px; border-radius: 8px; background: transparent;"></div>`;
+                return;
+            }
+            if (celda.tipo === 'calle') {
+                html += `<div style="min-height: 68px; border-radius: 8px; background: #0d0d10; border: 1px dashed rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:#52525b; font-size:0.8rem;">🛣️ ${celda.etiqueta || ''}</div>`;
+                return;
+            }
+            if (celda.tipo === 'elevador' || celda.tipo === 'escalera' || celda.tipo === 'entrada' || celda.tipo === 'salida') {
+                const iconos = { elevador: '🛗 ELEVADOR', escalera: '🪜 ESCALERA', entrada: '🚧 ENTRADA', salida: '🏁 SALIDA' };
+                html += `<div style="min-height: 68px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#e4e4e7; padding:4px;">${iconos[celda.tipo]}</div>`;
+                return;
+            }
+
+            // Es un cajón (normal o discapacitado)
+            const codigo = celda.codigo;
+            const estadoSensor = obtenerEstadoSensorCajon(celda);
+            const ticketInfo = infoPorCajon[codigo];
+            const esDisc = celda.tipo === 'discapacitado';
+
+            let colorFondo = esDisc ? 'rgba(10, 132, 255, 0.08)' : 'rgba(50, 215, 75, 0.06)';
+            let colorBorde = esDisc ? '#0A84FF' : 'rgba(50, 215, 75, 0.4)';
+            let colorTexto = esDisc ? '#60a5fa' : '#32D74B';
+            let etiqueta = esDisc ? '♿ LIBRE' : 'LIBRE';
+
+            if (estadoSensor === 'ocupado') {
+                if (ticketInfo && ticketInfo.estado === 'multado') {
+                    colorFondo = 'rgba(255, 0, 255, 0.14)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTADO';
+                } else if (!ticketInfo || ticketInfo.estado === 'reservado') {
+                    colorFondo = 'rgba(255, 149, 0, 0.18)'; colorBorde = '#FF9500'; colorTexto = '#FF9500'; etiqueta = 'OBSTRUIDO';
+                } else {
+                    colorFondo = 'rgba(255, 69, 58, 0.18)'; colorBorde = '#FF453A'; colorTexto = '#FF453A'; etiqueta = 'OCUPADO';
+                }
+            } else if (ticketInfo) {
+                if (ticketInfo.estado === 'multado') {
+                    colorFondo = 'rgba(255, 0, 255, 0.12)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTA';
+                } else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
+                    colorFondo = 'rgba(191, 90, 242, 0.15)'; colorBorde = '#BF5AF2'; colorTexto = '#BF5AF2'; etiqueta = 'EN TRÁNSITO';
+                } else if (ticketInfo.estado === 'reservado') {
+                    colorFondo = 'rgba(255, 214, 10, 0.14)'; colorBorde = '#FFD60A'; colorTexto = '#FFD60A'; etiqueta = 'RESERVADO';
+                }
+            }
+
+            const badgeHW = celda.sensorFisico ? `<span class="badge-sensor-hw" title="Conectado a ${celda.sensorFisico}">HW</span>` : '';
+
+            html += `
+                <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${celda.sensorFisico || ''}" style="position:relative; min-height: 68px; background: ${colorFondo}; border: 2px solid ${colorBorde}; border-radius: 10px; padding: 0.6rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s;">
+                    ${badgeHW}
+                    <strong style="color: #fff; font-size: 1.05rem;">${esDisc ? '♿ ' : ''}${codigo}</strong><br>
+                    <span style="font-size: 0.65rem; color: ${colorTexto}; font-weight: 800;">${etiqueta}</span>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        mapaContainer.innerHTML = html;
+
+        document.querySelectorAll('.cajon-admin').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const cod = btn.getAttribute('data-cajon');
+                const sensorHw = btn.getAttribute('data-sensor');
+                mostrarInspeccionCajon(cod, sensorHw, infoPorCajon[cod]);
+            });
+        });
+    }
+
+    function mostrarInspeccionCajon(codigoCajon, sensorFisico, datosTicket) {
+        const infoVehiculo = document.getElementById('info-vehiculo');
+        const tipoSensorTexto = sensorFisico
+            ? `🔌 Hardware ESP32 (${sensorFisico})`
+            : `☁️ Sensor Virtual IoT`;
+
+        const estadoActualSensor = sensorFisico
+            ? (adminEstadoFisico[sensorFisico] || 'libre')
+            : ((adminSensoresVirtuales[estacionamientoActivoId] || {})[codigoCajon] || 'libre');
+
+        const btnSimularSensor = `<button id="btn-toggle-sensor" style="width:100%; margin-top:8px; padding:10px; border-radius:8px; border:1px solid var(--spot-selected); background:rgba(10,132,255,0.12); color:#fff; font-weight:700; cursor:pointer;">
+            📡 Cambiar Sensor a "${estadoActualSensor === 'ocupado' ? 'LIBRE' : 'OCUPADO'}" (Prueba)
+        </button>`;
+
+        if (!datosTicket) {
+            infoVehiculo.innerHTML = `
+                <div style="width: 100%;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px dashed var(--border-dark); padding-bottom:8px; margin-bottom:12px;">
+                        <strong style="font-size:1.2rem; color:#fff;">Cajón ${codigoCajon}</strong>
+                        <span style="font-size:0.8rem; color:var(--spot-selected);">${tipoSensorTexto}</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size:0.9rem;">Sin reserva activa. Estado físico: <strong style="color:#fff; text-transform:uppercase;">${estadoActualSensor}</strong></p>
+                    ${btnSimularSensor}
+                </div>
+            `;
+        } else {
+            let tiempoVivo = '<span style="color: var(--text-muted);">Aún en tránsito</span>';
+            if (datosTicket.timestampIngresoFisico) {
+                const divisor = PARKIL_CONFIG.MODO_DEMO ? 1000 : 60000;
+                const min = Math.floor((Date.now() - datosTicket.timestampIngresoFisico) / divisor);
+                tiempoVivo = `<strong style="color:#fff; font-size:1.3rem;">${min} min</strong>`;
+            }
+
+            const btnAccion = datosTicket.estado === 'reservado'
+                ? `<button id="btn-cancelar-reserva" style="width:100%; padding:10px; background:rgba(255,69,58,0.2); border:1px solid var(--danger-neon); color:var(--danger-neon); border-radius:8px; cursor:pointer; font-weight:bold;">❌ Cancelar Reserva</button>`
+                : `<button id="btn-forzar-salida" style="width:100%; padding:10px; background:rgba(255,149,0,0.2); border:1px solid #FF9500; color:#FF9500; border-radius:8px; cursor:pointer; font-weight:bold;">⚠️ Forzar Finalización</button>`;
+
+            infoVehiculo.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:0.8rem; width:100%;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px dashed var(--border-dark); padding-bottom:6px;">
+                        <div>
+                            <small style="color:var(--text-muted);">ESTADO TICKET</small><br>
+                            <strong style="color:var(--spot-selected); font-size:1.15rem; text-transform:uppercase;">${datosTicket.estado}</strong>
+                        </div>
+                        <div style="text-align:right;">
+                            <small style="color:var(--text-muted);">CAJÓN</small><br>
+                            <strong style="color:#fff; font-size:1.2rem;">${datosTicket.cajon}</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <small style="color:var(--text-muted);">CLIENTE / CÓDIGO</small><br>
+                        <strong style="color:#fff;">${datosTicket.nombre} (${datosTicket.placa})</strong> — <span style="font-family:monospace; color:var(--spot-selected);">${datosTicket.id}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Tiempo en cajón: ${tiempoVivo}</span>
+                        <small style="color:var(--text-muted);">${tipoSensorTexto}</small>
+                    </div>
+                    ${btnAccion}
+                    ${btnSimularSensor}
+                </div>
+            `;
+
+            const btnCancelar = document.getElementById('btn-cancelar-reserva');
+            if (btnCancelar) {
+                btnCancelar.addEventListener('click', () => {
+                    set(ref(db, `tickets_activos/${datosTicket.id}`), null);
+                    set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                    set(ref(db, `cajones_bloqueados_${estacionamientoActivoId}/${codigoCajon}`), null);
+                    showToast("Reserva cancelada y cajón liberado", "success");
+                });
+            }
+
+            const btnForzar = document.getElementById('btn-forzar-salida');
+            if (btnForzar) {
+                btnForzar.addEventListener('click', async () => {
+                    datosTicket.estadoFinal = "completado_forzoso";
+                    datosTicket.timestampSalida = Date.now();
+                    await setDoc(doc(firestoreDB, "historial_tickets", datosTicket.id), datosTicket);
+                    await set(ref(db, `tickets_activos/${datosTicket.id}`), null);
+                    await set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                    await set(ref(db, `cajones_bloqueados_${estacionamientoActivoId}/${codigoCajon}`), null);
+                    showToast("Ticket archivado y cajón liberado", "success");
+                    cargarHistorial();
+                });
+            }
+        }
+
+        const btnToggle = document.getElementById('btn-toggle-sensor');
+        if (btnToggle) {
+            btnToggle.addEventListener('click', async () => {
+                const nuevoEstado = estadoActualSensor === 'ocupado' ? 'libre' : 'ocupado';
+                if (sensorFisico) {
+                    await set(ref(db, `estacionamiento_actual/${sensorFisico}`), nuevoEstado);
+                } else {
+                    await set(ref(db, `sensores_virtuales/${estacionamientoActivoId}/${codigoCajon}`), nuevoEstado);
+                }
+                showToast(`Sensor de ${codigoCajon} cambiado a ${nuevoEstado.toUpperCase()}`, "info");
+                mostrarInspeccionCajon(codigoCajon, sensorFisico, datosTicket);
+            });
+        }
+    }
+
+    // --- 3. PESTAÑA 2: MAPA LEAFLET Y ALTA DE ESTACIONAMIENTO ---
+    function inicializarMapaLeaflet() {
+        const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
+        const lat = Number(sede.lat) || 19.8454;
+        const lng = Number(sede.lng) || -90.5358;
+
+        if (!mapaLeaflet) {
+            mapaLeaflet = L.map('mapa-admin-leaflet').setView([lat, lng], 15);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap & CartoDB'
+            }).addTo(mapaLeaflet);
+
+            marcadorLeaflet = L.marker([lat, lng], { draggable: true }).addTo(mapaLeaflet);
+
+            mapaLeaflet.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                marcadorLeaflet.setLatLng([lat, lng]);
+                document.getElementById('est-lat').value = lat.toFixed(6);
+                document.getElementById('est-lng').value = lng.toFixed(6);
+            });
+
+            marcadorLeaflet.on('dragend', () => {
+                const pos = marcadorLeaflet.getLatLng();
+                document.getElementById('est-lat').value = pos.lat.toFixed(6);
+                document.getElementById('est-lng').value = pos.lng.toFixed(6);
+            });
+        } else {
+            mapaLeaflet.invalidateSize();
+            mapaLeaflet.setView([lat, lng], 15);
+            marcadorLeaflet.setLatLng([lat, lng]);
+        }
+    }
+
+    function cargarFormularioSedeActiva() {
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!sede) return;
+        document.getElementById('est-nombre').value = sede.nombre || '';
+        document.getElementById('est-direccion').value = sede.direccion || '';
+        document.getElementById('est-tarifa').value = sede.tarifaHora || 25;
+        document.getElementById('est-niveles').value = String(sede.niveles || 1);
+        document.getElementById('est-lat').value = sede.lat || 19.8454;
+        document.getElementById('est-lng').value = sede.lng || -90.5358;
+    }
+
+    document.getElementById('btn-nuevo-estacionamiento').addEventListener('click', () => {
+        const nuevoId = 'parkil_sede_' + Date.now().toString().slice(-5);
+        const nuevaSede = crearEstacionamientoPorDefecto();
+        nuevaSede.id = nuevoId;
+        nuevaSede.nombre = "Nueva Sucursal Parkil";
+        nuevaSede.direccion = "San Francisco de Campeche";
+        nuevaSede.lat = 19.8485;
+        nuevaSede.lng = -90.5320;
+        // Limpiar sensores físicos para que no choquen con la matriz
+        Object.values(nuevaSede.pisos).forEach(p => p.celdas.forEach(c => c.sensorFisico = ""));
+
+        catalogoEstacionamientos[nuevoId] = nuevaSede;
+        estacionamientoActivoId = nuevoId;
+        cargarFormularioSedeActiva();
+        inicializarMapaLeaflet();
+        showToast("Formulario listo para registrar la nueva sucursal", "info");
+    });
+
+    document.getElementById('form-alta-estacionamiento').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
+        sede.nombre = document.getElementById('est-nombre').value.trim();
+        sede.direccion = document.getElementById('est-direccion').value.trim();
+        sede.tarifaHora = Number(document.getElementById('est-tarifa').value) || 25;
+        sede.niveles = Number(document.getElementById('est-niveles').value) || 1;
+        sede.lat = Number(document.getElementById('est-lat').value) || 19.8454;
+        sede.lng = Number(document.getElementById('est-lng').value) || -90.5358;
+
+        // Asegurar que existan los pisos solicitados
+        if (!sede.pisos) sede.pisos = {};
+        for (let i = 1; i <= sede.niveles; i++) {
+            if (!sede.pisos[String(i)]) {
+                sede.pisos[String(i)] = {
+                    columnas: 5,
+                    filas: 4,
+                    celdas: Array.from({ length: 20 }, (_, idx) => ({
+                        tipo: idx < 5 ? 'cajon' : 'calle',
+                        codigo: `P${i}-${idx + 1}`,
+                        sensorFisico: ''
+                    }))
+                };
+            }
+        }
+
+        await set(ref(db, `estacionamientos_red/${estacionamientoActivoId}`), sede);
+        showToast("¡Estacionamiento y ubicación guardados en la nube!", "success");
+    });
+
+    // --- 4. PESTAÑA 3: CONSTRUCTOR DE ESTACIONAMIENTO (MODO JUEGO) ---
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('activo'));
+            btn.classList.add('activo');
+            herramientaActual = btn.getAttribute('data-tool');
+        });
+    });
+
+    function renderizarConstructor() {
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        const gridContainer = document.getElementById('grid-builder-container');
+        const pisosTabs = document.getElementById('builder-pisos-tabs');
+        if (!sede || !gridContainer || !pisosTabs) return;
+
+        // Botones de pisos
+        pisosTabs.innerHTML = '';
+        for (let p = 1; p <= (Number(sede.niveles) || 1); p++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `piso-pill ${p === pisoBuilderActual ? 'activo' : ''}`;
+            btn.textContent = `Nivel ${p}`;
+            btn.addEventListener('click', () => {
+                pisoBuilderActual = p;
+                celdaEditandoIndex = null;
+                document.getElementById('inspector-celda-builder').classList.add('oculto');
+                renderizarConstructor();
+            });
+            pisosTabs.appendChild(btn);
+        }
+
+        const pisoObj = sede.pisos[String(pisoBuilderActual)] || sede.pisos["1"];
+        gridContainer.style.gridTemplateColumns = `repeat(${pisoObj.columnas}, minmax(95px, 1fr))`;
+        gridContainer.innerHTML = '';
+
+        let totalCajones = 0;
+        let totalFisicos = 0;
+        let totalDisc = 0;
+
+        pisoObj.celdas.forEach((celda, idx) => {
+            if (celda.tipo === 'cajon' || celda.tipo === 'discapacitado') totalCajones++;
+            if (celda.sensorFisico) totalFisicos++;
+            if (celda.tipo === 'discapacitado') totalDisc++;
+
+            const div = document.createElement('div');
+            div.className = `celda-plano tipo-${celda.tipo} ${celdaEditandoIndex === idx ? 'editando' : ''}`;
+
+            let contenido = '';
+            if (celda.tipo === 'cajon') {
+                contenido = `<strong>🚗 ${celda.codigo || 'C' + (idx + 1)}</strong><small style="font-size:0.68rem;">${celda.sensorFisico || 'Virtual'}</small>`;
+            } else if (celda.tipo === 'discapacitado') {
+                contenido = `<strong>♿ ${celda.codigo || 'E' + (idx + 1)}</strong><small style="font-size:0.68rem;">Preferente</small>`;
+            } else if (celda.tipo === 'elevador') {
+                contenido = `<span style="font-size:1.3rem;">🛗</span><small style="font-weight:700;">ELEVADOR</small>`;
+            } else if (celda.tipo === 'escalera') {
+                contenido = `<span style="font-size:1.3rem;">🪜</span><small style="font-weight:700;">ESCALERA</small>`;
+            } else if (celda.tipo === 'entrada') {
+                contenido = `<span style="font-size:1.3rem;">🚧</span><small style="font-weight:700;">ENTRADA</small>`;
+            } else if (celda.tipo === 'salida') {
+                contenido = `<span style="font-size:1.3rem;">🏁</span><small style="font-weight:700;">SALIDA</small>`;
+            } else if (celda.tipo === 'calle') {
+                contenido = `<span>🛣️ Carril</span>`;
+            } else {
+                contenido = `<span style="color:#3f3f46; font-size:0.75rem;">Vacío</span>`;
+            }
+
+            div.innerHTML = contenido;
+
+            div.addEventListener('click', () => {
+                aplicarHerramientaEnCelda(pisoObj, idx);
+            });
+
+            gridContainer.appendChild(div);
+        });
+
+        document.getElementById('resumen-builder-stats').textContent =
+            `Nivel ${pisoBuilderActual}: ${totalCajones} cajones en este piso | ${totalFisicos} vinculados a sensores físicos ESP32 | ${totalDisc} para discapacitados`;
+    }
+
+    function aplicarHerramientaEnCelda(pisoObj, idx) {
+        const celda = pisoObj.celdas[idx];
+        const letraFila = String.fromCharCode(65 + Math.floor(idx / pisoObj.columnas));
+        const numCol = (idx % pisoObj.columnas) + 1;
+
+        if (herramientaActual === 'cajon' || herramientaActual === 'discapacitado') {
+            celda.tipo = herramientaActual;
+            if (!celda.codigo) celda.codigo = `${letraFila}${numCol}`;
+            celdaEditandoIndex = idx;
+            abrirInspectorCelda(celda);
+        } else {
+            celda.tipo = herramientaActual;
+            delete celda.codigo;
+            celda.sensorFisico = "";
+            celdaEditandoIndex = null;
+            document.getElementById('inspector-celda-builder').classList.add('oculto');
+        }
+        renderizarConstructor();
+    }
+
+    function abrirInspectorCelda(celda) {
+        const inspector = document.getElementById('inspector-celda-builder');
+        const inputCod = document.getElementById('input-codigo-cajon');
+        const selectHw = document.getElementById('select-sensor-fisico');
+
+        inspector.classList.remove('oculto');
+        document.getElementById('lbl-cajon-edit').textContent = celda.codigo;
+        inputCod.value = celda.codigo || '';
+        selectHw.value = celda.sensorFisico || '';
+
+        inputCod.oninput = () => {
+            celda.codigo = inputCod.value.trim().toUpperCase() || 'A1';
+            document.getElementById('lbl-cajon-edit').textContent = celda.codigo;
+            renderizarConstructor();
+        };
+
+        selectHw.onchange = () => {
+            celda.sensorFisico = selectHw.value;
+            renderizarConstructor();
+        };
+    }
+
+    document.getElementById('select-grid-size').addEventListener('change', (e) => {
+        const [cols, rows] = e.target.value.split('x').map(Number);
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!sede) return;
+        const nuevoTotal = cols * rows;
+        const celdasNuevas = Array.from({ length: nuevoTotal }, (_, i) => {
+            const letra = String.fromCharCode(65 + Math.floor(i / cols));
+            const num = (i % cols) + 1;
+            return { tipo: 'cajon', codigo: `${letra}${num}`, sensorFisico: '' };
+        });
+        sede.pisos[String(pisoBuilderActual)] = { columnas: cols, filas: rows, celdas: celdasNuevas };
+        renderizarConstructor();
+    });
+
+    document.getElementById('btn-plantilla-maqueta').addEventListener('click', () => {
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!sede) return;
+        sede.pisos["1"] = crearEstacionamientoPorDefecto().pisos["1"];
+        pisoBuilderActual = 1;
+        renderizarConstructor();
+        showToast("Plantilla con los 6 sensores de la maqueta cargada", "info");
+    });
+
+    document.getElementById('btn-guardar-plano').addEventListener('click', async () => {
+        const sede = catalogoEstacionamientos[estacionamientoActivoId];
+        if (!sede) return;
+        await set(ref(db, `estacionamientos_red/${estacionamientoActivoId}`), sede);
+        showToast("¡Plano del estacionamiento guardado y publicado en vivo!", "success");
+    });
+
+    // --- 5. BOTONES DE PLUMA, CENTRO DE RESOLUCIONES E HISTORIAL ---
+    document.getElementById('btn-emergencia-entrada').addEventListener('click', () => {
+        set(ref(db, 'control_plumas/entrada'), 'abrir');
+        showToast("Señal enviada: Abriendo pluma de Entrada", "info");
+    });
+
+    document.getElementById('btn-emergencia-salida').addEventListener('click', () => {
+        set(ref(db, 'control_plumas/salida'), 'abrir');
+        showToast("Señal enviada: Abriendo pluma de Salida", "info");
+    });
+
+    // Centro de resoluciones
+    const inputBusqueda = document.getElementById('input-busqueda-admin');
+    const btnBuscar = document.getElementById('btn-buscar-admin');
+    const divResultado = document.getElementById('resultado-busqueda');
+
+    btnBuscar.addEventListener('click', () => {
+        const query = inputBusqueda.value.trim().toUpperCase();
+        if (!query) { showToast("Ingresa una placa o código PARK-XXXX", "error"); return; }
+
+        let encontrado = null;
+        let idEncontrado = null;
+        for (let id in adminTicketsActivos) {
+            const t = adminTicketsActivos[id];
+            if (id.toUpperCase() === query || (t.placa || '').toUpperCase() === query) {
+                encontrado = t;
+                idEncontrado = id;
+                break;
+            }
+        }
+
+        divResultado.classList.remove('oculto');
+        if (!encontrado) {
+            divResultado.innerHTML = `<p style="color: var(--danger-neon); text-align:center; font-weight:bold; margin:0;">❌ Vehículo o ticket activo no encontrado</p>`;
+            return;
+        }
+
+        let accionHTML = `<button class="btn-primario-azul" id="btn-abrir-res" style="width:100%; margin-top:10px;">🚧 Autorizar Pago en Efectivo y Abrir Pluma Salida</button>`;
+        divResultado.innerHTML = `
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+                <div>
+                    <strong>${encontrado.nombre}</strong> (${encontrado.placa})<br>
+                    <span style="color:var(--spot-selected); font-family:monospace;">${idEncontrado}</span>
+                </div>
+                <div style="text-align:right;">
+                    Estado: <strong style="color:#FFD60A; text-transform:uppercase;">${encontrado.estado}</strong><br>
+                    Cajón: <strong>${encontrado.cajon}</strong>
+                </div>
+            </div>
+            ${accionHTML}
+        `;
+
+        document.getElementById('btn-abrir-res').addEventListener('click', async () => {
+            await update(ref(db, `tickets_activos/${idEncontrado}`), {
+                estado: 'pagado',
+                timestampPagado: Date.now()
+            });
+            await set(ref(db, 'control_plumas/salida'), 'abrir');
+            showToast("Ticket marcado como pagado y abriendo pluma de salida", "success");
+        });
+    });
+
+    // Historial y Gráfica
     async function cargarHistorial() {
         try {
             const querySnapshot = await getDocs(collection(firestoreDB, "historial_tickets"));
             let totalDinero = 0;
             let totalTickets = 0;
             historialGlobal = [];
-
-            // Contadores para la gráfica
             let paquetesCount = { 'Express': 0, 'Estándar': 0, 'Reunión': 0, 'Máximo': 0 };
 
             querySnapshot.forEach((documento) => {
-                const ticket = documento.data(); 
-                ticket.idReal = documento.id; 
+                const ticket = documento.data();
+                ticket.idReal = documento.id;
                 historialGlobal.push(ticket);
 
                 const reserva = Number(ticket.pagoReserva) || 0;
@@ -64,453 +810,92 @@ document.addEventListener('DOMContentLoaded', () => {
                 const multa = Number(ticket.pagoMulta) || 0;
                 const sumaTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
 
-                // 🐛 CORRECCIÓN DE LA GRÁFICA: Ignoramos los emojis buscando la palabra clave
                 const paq = ticket.paquete || "";
                 if (paq.includes('Express')) paquetesCount['Express']++;
-                else if (paq.includes('Estándar')) paquetesCount['Estándar']++;
-                else if (paq.includes('Reunión')) paquetesCount['Reunión']++;
-                else if (paq.includes('Máximo')) paquetesCount['Máximo']++;
+                else if (paq.includes('Est')) paquetesCount['Estándar']++;
+                else if (paq.includes('Reuni')) paquetesCount['Reunión']++;
+                else if (paq.includes('x')) paquetesCount['Máximo']++;
 
                 totalTickets++;
-                totalDinero += sumaTotal; 
+                totalDinero += sumaTotal;
             });
 
-            statTickets.textContent = totalTickets;
-            statIngresos.textContent = `$${totalDinero.toFixed(2)}`;
+            document.getElementById('stat-tickets').textContent = totalTickets;
+            document.getElementById('stat-ingresos').textContent = `$${totalDinero.toFixed(2)}`;
             renderizarTablaHistorial(historialGlobal);
-            
-            // Dibujamos la dona si hay datos
             if (totalTickets > 0) dibujarGrafica(paquetesCount);
-
-        } catch (error) {
-            console.error("Error al cargar historial:", error);
+        } catch (err) {
+            console.error("Error al cargar historial:", err);
         }
     }
 
     function dibujarGrafica(conteo) {
         const ctx = document.getElementById('graficaPaquetes');
-        if(!ctx) return; // Por si no ha cargado el HTML
-
-        if (chartInstancia) chartInstancia.destroy(); // Limpiamos la anterior
-
+        if (!ctx) return;
+        if (chartInstancia) chartInstancia.destroy();
         chartInstancia = new Chart(ctx.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: ['Express', 'Estándar', 'Reunión', 'Máximo'],
                 datasets: [{
                     data: [conteo['Express'], conteo['Estándar'], conteo['Reunión'], conteo['Máximo']],
-                    backgroundColor: ['#0A84FF', '#32D74B', '#FFD60A', '#BF5AF2'],
-                    borderWidth: 0,
-                    hoverOffset: 4
+                    backgroundColor: ['#0A84FF', '#32D74B', '#FFE600', '#BF5AF2'],
+                    borderWidth: 0
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'right', labels: { color: '#8E8E93' } }
-                }
+                plugins: { legend: { position: 'right', labels: { color: '#a1a1aa' } } }
             }
         });
     }
 
     function renderizarTablaHistorial(datos) {
-        let htmlTabla = '';
+        const tablaBody = document.getElementById('tabla-body-historial');
         if (datos.length === 0) {
-            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay tickets encontrados.</td></tr>`;
+            tablaBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay tickets registrados.</td></tr>`;
             return;
         }
-
-        datos.forEach(ticket => {
-            const reserva = Number(ticket.pagoReserva) || 0;
-            const tiempo = Number(ticket.pagoEstacionamiento) || 0;
-            const multa = Number(ticket.pagoMulta) || 0;
-            const sumaTotal = Number(ticket.granTotal) || (reserva + tiempo + multa);
-
-            const nombreCliente = ticket.nombre || "Cliente Web";
-            const placaCliente = ticket.placa || "N/A";
-            
-            let tiempoTexto = "--";
-            if (ticket.timestampIngresoFisico && ticket.timestampSalida) {
-                const min = Math.ceil((ticket.timestampSalida - ticket.timestampIngresoFisico) / 60000);
-                tiempoTexto = `${min} min`;
-            }
-
-            let uiDinero = `<strong style="color: var(--success-neon); font-size: 1.1rem;">$${sumaTotal.toFixed(2)}</strong><br>`;
-            uiDinero += `<span style="font-size: 0.75rem; color: var(--text-muted);">Reserva: $${reserva.toFixed(2)}</span><br>`;
-            if (tiempo > 0) uiDinero += `<span style="font-size: 0.75rem; color: var(--text-muted);">Tiempo: $${tiempo.toFixed(2)}</span><br>`;
-            if (multa > 0) uiDinero += `<span style="font-size: 0.75rem; color: var(--danger-neon);">Multa: +$${multa.toFixed(2)}</span>`;
-
-            htmlTabla += `
+        tablaBody.innerHTML = datos.map(t => {
+            const reserva = Number(t.pagoReserva) || 0;
+            const tiempo = Number(t.pagoEstacionamiento) || 0;
+            const multa = Number(t.pagoMulta) || 0;
+            const sumaTotal = Number(t.granTotal) || (reserva + tiempo + multa);
+            const sedeNombre = t.estacionamientoNombre || "Parkil Campeche";
+            return `
                 <tr>
-                    <td style="font-family: monospace; color: var(--spot-selected);">${ticket.idReal.substring(0,8)}...</td>
-                    <td><strong>${nombreCliente}</strong><br><span style="font-size: 0.8rem; color: var(--text-muted);">${placaCliente}</span></td>
-                    <td><strong>${ticket.cajon}</strong></td>
-                    <td>${tiempoTexto}</td>
-                    <td>${uiDinero}</td>
+                    <td style="font-family:monospace; color:var(--spot-selected);">${t.idReal}</td>
+                    <td><strong>${t.nombre || 'Cliente'}</strong><br><small style="color:var(--text-muted);">${t.placa || 'N/A'}</small></td>
+                    <td><strong>${t.cajon}</strong><br><small style="color:var(--text-muted);">${sedeNombre}</small></td>
+                    <td>${t.paquete || 'Estándar'}</td>
+                    <td><strong style="color:var(--success-neon);">$${sumaTotal.toFixed(2)}</strong></td>
                     <td><span class="badge-pagado">Completado</span></td>
                 </tr>
             `;
-        });
-        tablaBody.innerHTML = htmlTabla;
+        }).join('');
     }
+
+    document.getElementById('filtro-historial').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        renderizarTablaHistorial(historialGlobal.filter(t =>
+            (t.placa && t.placa.toLowerCase().includes(q)) ||
+            (t.nombre && t.nombre.toLowerCase().includes(q))
+        ));
+    });
+
+    document.getElementById('btn-exportar-csv').addEventListener('click', () => {
+        let csv = "ID_Ticket,Cliente,Placa,Estacionamiento,Cajon,Total\n";
+        historialGlobal.forEach(t => {
+            const total = Number(t.granTotal) || 0;
+            csv += `${t.idReal},${t.nombre},${t.placa},${t.estacionamientoNombre || 'Matriz'},${t.cajon},$${total}\n`;
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = "Reporte_Parkil.csv";
+        link.click();
+        showToast("Reporte CSV descargado", "success");
+    });
 
     cargarHistorial();
-
-    if(filtroHistorial) {
-        filtroHistorial.addEventListener('input', (e) => {
-            const texto = e.target.value.toLowerCase();
-            const filtrados = historialGlobal.filter(t => 
-                (t.placa && t.placa.toLowerCase().includes(texto)) || 
-                (t.nombre && t.nombre.toLowerCase().includes(texto))
-            );
-            renderizarTablaHistorial(filtrados);
-        });
-    }
-
-    if (btnExportar) {
-        btnExportar.addEventListener('click', () => {
-            let csv = "ID_Ticket,Cliente,Placa,Cajon,Pago_Reserva,Pago_Tiempo,Pago_Multa,Total\n";
-            historialGlobal.forEach(t => {
-                const reserva = Number(t.pagoReserva) || 0;
-                const tiempo = Number(t.pagoEstacionamiento) || 0;
-                const multa = Number(t.pagoMulta) || 0;
-                const total = Number(t.granTotal) || (reserva+tiempo+multa);
-                csv += `${t.idReal},${t.nombre},${t.placa},${t.cajon},$${reserva},$${tiempo},$${multa},$${total}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "Reporte_CloudPark.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast("Reporte Excel descargado con éxito", "success");
-        });
-    }
-
-
-// --- 🗑️ RECOLECTOR DE BASURA SUPER AGRESIVO ---
-    let adminTicketsActivos = {};
-    let adminEstadoFisico = {};
-
-    setInterval(() => {
-        const ahora = new Date().getTime();
-        
-        for (let id in adminTicketsActivos) {
-            let t = adminTicketsActivos[id];
-            
-            if (t.estado === 'reservado' && t.timestampExpiracion) {
-                const limiteConTolerancia = t.timestampExpiracion + 60000;
-                const segundosRestantes = Math.floor((limiteConTolerancia - ahora) / 1000);
-                
-                if (segundosRestantes > 0 && segundosRestantes <= 60) {
-                    console.log(`⏳ Ticket ${id} será eliminado en ${segundosRestantes} segundos...`);
-                }
-
-                // Usamos <= 0 para atraparlo incluso si Chrome pausó el reloj por unos segundos
-                if (segundosRestantes <= 0) {
-                    console.log(`💥 [SISTEMA] El ticket ${id} expiró. Ejecutando exterminio...`);
-                    
-                    try {
-                        // 1. Borramos el ticket de la RTDB instantáneamente
-                        set(ref(db, `tickets_activos/${id}`), null)
-                            .then(() => console.log(`✅ Ticket ${id} fulminado de la base de datos.`));
-                        
-                        // 2. Liberamos el candado del cajón
-                        if (t.cajon) {
-                            set(ref(db, `cajones_bloqueados/${t.cajon}`), null);
-                        }
-                        
-                        showToast(`Cajón ${t.cajon} liberado (Reserva expirada)`, 'error');
-                        
-                        // 3. Lo sacamos de nuestra memoria local para no borrarlo 2 veces
-                        delete adminTicketsActivos[id];
-
-                    } catch (error) {
-                        console.error("❌ Error en el Recolector:", error);
-                    }
-                }
-            }
-        }
-    }, 3000); // ⏱️ Lo bajamos a 3 segundos para que sea ultra rápido
-
-
-    // --- MATRIZ DE ESTADOS EN TIEMPO REAL ---
-    const ticketsActivosRef = ref(db, 'tickets_activos');
-    const sensoresFisicosRef = ref(db, 'estacionamiento_actual');
-
-    onValue(ticketsActivosRef, (snapshot) => {
-        adminTicketsActivos = snapshot.val() || {};
-        dibujarMapaAdmin();
-    });
-
-    onValue(sensoresFisicosRef, (snapshot) => {
-        adminEstadoFisico = snapshot.val() || {};
-        const equivalenciasInversas = {
-            'cajon_1': 'A1', 'cajon_2': 'A2', 'cajon_3': 'A3',
-            'cajon_4': 'B1', 'cajon_5': 'B2', 'cajon_6': 'B3'
-        };
-        for(let keySensor in adminEstadoFisico) {
-            let estado = String(adminEstadoFisico[keySensor]).trim().toLowerCase();
-            if(estado === 'ocupado') {
-                let nombreCajon = equivalenciasInversas[keySensor];
-                for(let idTicket in adminTicketsActivos) {
-                    let t = adminTicketsActivos[idTicket];
-                    if(t.cajon === nombreCajon && t.estado === 'en_uso' && !t.timestampIngresoFisico) {
-                        update(ref(db, `tickets_activos/${idTicket}`), {
-                            timestampIngresoFisico: new Date().getTime()
-                        });
-                    }
-                }
-            }
-        }
-        dibujarMapaAdmin();
-    });
-
-    function dibujarMapaAdmin() {
-        const equivalencias = { 'A1': 'cajon_1', 'A2': 'cajon_2', 'A3': 'cajon_3', 'B1': 'cajon_4', 'B2': 'cajon_5', 'B3': 'cajon_6' };
-        let infoPorCajon = {};
-        for (let id in adminTicketsActivos) {
-            infoPorCajon[adminTicketsActivos[id].cajon] = { id: id, ...adminTicketsActivos[id] };
-        }
-        let htmlMapa = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">`;
-        ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'].forEach(cajon => {
-            const idSensor = equivalencias[cajon];
-            const estadoSensor = adminEstadoFisico[idSensor]; 
-            const ticketInfo = infoPorCajon[cajon];
-
-            let colorFondo = 'rgba(255,255,255,0.02)';
-            let colorBorde = 'var(--border-dark)';
-            let colorTexto = 'var(--text-muted)';
-            let etiqueta = 'LIBRE';
-            let brillo = 'none';
-
-            if (estadoSensor === 'ocupado') {
-                if (ticketInfo && ticketInfo.estado === 'multado') {
-                    colorFondo = 'rgba(255, 0, 255, 0.1)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTADO'; brillo = '0 0 15px rgba(255, 0, 255, 0.4)';
-                } else if (!ticketInfo || ticketInfo.estado === 'reservado') {
-                    colorFondo = 'rgba(255, 149, 0, 0.15)'; colorBorde = '#FF9500'; colorTexto = '#FF9500'; etiqueta = 'OBSTRUIDO';
-                } else {
-                    colorFondo = 'rgba(255, 69, 58, 0.15)'; colorBorde = 'var(--danger-neon)'; colorTexto = 'var(--danger-neon)'; etiqueta = 'OCUPADO';
-                }
-            } else {
-                if (ticketInfo) {
-                    if (ticketInfo.estado === 'multado') {
-                        colorFondo = 'rgba(191, 90, 242, 0.1)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTA PENDIENTE';
-                    } else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
-                        colorFondo = 'rgba(191, 90, 242, 0.1)'; colorBorde = '#BF5AF2'; colorTexto = '#BF5AF2'; etiqueta = 'EN TRÁNSITO'; brillo = 'inset 0 0 10px rgba(191, 90, 242, 0.3)';
-                    } else if (ticketInfo.estado === 'reservado') {
-                        colorFondo = 'rgba(255, 214, 10, 0.1)'; colorBorde = '#FFD60A'; etiqueta = 'RESERVADO';
-                    }
-                }
-            }
-
-            htmlMapa += `
-                <div class="cajon-admin" data-cajon="${cajon}" style="background: ${colorFondo}; border: 2px solid ${colorBorde}; box-shadow: ${brillo}; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.3s;">
-                    <strong style="color: #fff; font-size: 1.2rem;">${cajon}</strong><br>
-                    <span style="font-size: 0.7rem; color: ${colorTexto}; text-transform: uppercase; font-weight: bold;">${etiqueta}</span>
-                </div>
-            `;
-        });
-        htmlMapa += `</div>`;
-        mapaContainer.innerHTML = htmlMapa;
-
-        document.querySelectorAll('.cajon-admin').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const cajonSeleccionado = btn.getAttribute('data-cajon');
-                const datos = infoPorCajon[cajonSeleccionado];
-                if (datos) {
-                    mostrarInfo(datos);
-                } else {
-                    infoVehiculo.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted);"><p>Cajón vacío y sin reservas.</p></div>`;
-                }
-            });
-        });
-    }
-
-    function mostrarInfo(datos) {
-        let tiempoVivo = '<span style="color: var(--text-muted); font-size: 1.1rem;">Aún en tránsito</span>';
-        if (datos.timestampIngresoFisico) {
-            const minutos = Math.floor((new Date().getTime() - datos.timestampIngresoFisico) / 60000);
-            tiempoVivo = `<span style="color: #FFFFFF; font-weight: bold; font-size: 1.4rem;">${minutos} <small style="font-size: 0.9rem; color: var(--text-muted);">min</small></span>`;
-        }
-
-        let botonesAccion = '';
-        if (datos.estado === 'reservado') {
-            botonesAccion = `<button id="btn-cancelar-reserva" data-id="${datos.id}" data-cajon="${datos.cajon}" style="width: 100%; padding: 10px; background: rgba(255, 69, 58, 0.2); border: 1px solid var(--danger-neon); color: var(--danger-neon); border-radius: 8px; cursor: pointer; font-weight: bold;">🚫 Cancelar Reserva</button>`;
-        } else {
-            botonesAccion = `<button id="btn-forzar-salida" data-id="${datos.id}" data-cajon="${datos.cajon}" style="width: 100%; padding: 10px; background: rgba(255, 149, 0, 0.2); border: 1px solid #FF9500; color: #FF9500; border-radius: 8px; cursor: pointer; font-weight: bold;">🧹 Forzar Finalización</button>`;
-        }
-
-        infoVehiculo.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 100%;">
-                <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem; display: flex; justify-content: space-between;">
-                    <div>
-                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Estado</span><br>
-                        <strong style="color: var(--spot-selected); font-size: 1.3rem;">${datos.estado}</strong>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cajón</span><br>
-                        <strong style="color: #fff; font-size: 1.3rem;">${datos.cajon}</strong>
-                    </div>
-                </div>
-                <div style="border-bottom: 1px dashed var(--border-dark); padding-bottom: 0.5rem;">
-                    <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Cliente / Código</span><br>
-                    <strong style="color: #fff; font-size: 1rem;">${datos.nombre} (${datos.placa})</strong><br>
-                    <span style="color: var(--spot-selected); font-family: monospace;">${datos.id}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Tiempo</span><br>
-                        ${tiempoVivo}
-                    </div>
-                </div>
-                <div style="margin-top: 10px;">${botonesAccion}</div>
-            </div>
-        `;
-
-        const btnCancelar = document.getElementById('btn-cancelar-reserva');
-        if (btnCancelar) {
-            btnCancelar.addEventListener('click', (e) => {
-                if(confirm("¿Cancelar esta reserva? El lugar quedará libre.")) {
-                    const idT = e.target.getAttribute('data-id');
-                    const caj = e.target.getAttribute('data-cajon');
-                    set(ref(db, `tickets_activos/${idT}`), null);
-                    set(ref(db, `cajones_bloqueados/${caj}`), null);
-                    showToast("Reserva cancelada exitosamente.", "success");
-                    infoVehiculo.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Reserva cancelada.</p>`;
-                }
-            });
-        }
-
-        const btnForzar = document.getElementById('btn-forzar-salida');
-        if (btnForzar) {
-            btnForzar.addEventListener('click', async (e) => {
-                if(confirm("ATENCIÓN: Esto sacará al auto del sistema. ¿Continuar?")) {
-                    const idT = e.target.getAttribute('data-id');
-                    const caj = e.target.getAttribute('data-cajon');
-                    const ticketAForzar = adminTicketsActivos[idT];
-                    ticketAForzar.estadoFinal = "completado_forzoso";
-                    ticketAForzar.timestampSalida = new Date().getTime();
-                    
-                    await setDoc(doc(firestoreDB, "historial_tickets", idT), ticketAForzar);
-                    set(ref(db, `tickets_activos/${idT}`), null);
-                    set(ref(db, `cajones_bloqueados/${caj}`), null);
-                    
-                    showToast("Vehículo removido del sistema.", "success");
-                    infoVehiculo.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Ticket finalizado y cajón liberado.</p>`;
-                    cargarHistorial(); 
-                }
-            });
-        }
-    }
-
-    const btnEmergenciaEntrada = document.getElementById('btn-emergencia-entrada');
-    const btnEmergenciaSalida = document.getElementById('btn-emergencia-salida');
-
-    if(btnEmergenciaEntrada) {
-        btnEmergenciaEntrada.addEventListener('click', () => {
-            set(ref(db, 'control_plumas/entrada'), 'abrir');
-            showToast("Señal enviada: Abriendo pluma de Entrada", "info");
-        });
-    }
-
-    if(btnEmergenciaSalida) {
-        btnEmergenciaSalida.addEventListener('click', () => {
-            set(ref(db, 'control_plumas/salida'), 'abrir');
-            showToast("Señal enviada: Abriendo pluma de Salida", "info");
-        });
-    }
-
-    const inputBusqueda = document.getElementById('input-busqueda-admin');
-    const btnBuscar = document.getElementById('btn-buscar-admin');
-    const divResultado = document.getElementById('resultado-busqueda');
-
-    if (btnBuscar && inputBusqueda) {
-        inputBusqueda.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); btnBuscar.click(); }
-        });
-
-        btnBuscar.addEventListener('click', () => {
-            const query = inputBusqueda.value.trim().toUpperCase();
-            if (!query) { showToast("Por favor ingresa una placa o código.", "error"); return; }
-
-            btnBuscar.textContent = "Buscando...";
-            divResultado.classList.add('oculto');
-            
-            let ticketEncontrado = null;
-            let idTicketEncontrado = null;
-
-            for (let id in adminTicketsActivos) {
-                const t = adminTicketsActivos[id];
-                if (id.trim().toUpperCase() === query || (t.placa || "").trim().toUpperCase() === query) {
-                    ticketEncontrado = t;
-                    idTicketEncontrado = id;
-                    break; 
-                }
-            }
-
-            setTimeout(() => {
-                btnBuscar.textContent = "Buscar Cliente";
-                divResultado.classList.remove('oculto');
-
-                if (!ticketEncontrado) {
-                    divResultado.innerHTML = `<div style="text-align: center; padding: 10px;"><p style="color: var(--danger-neon); margin: 0; font-weight: bold; font-size: 1.1rem;">❌ Vehículo no encontrado</p></div>`;
-                    return;
-                }
-
-                let colorEstado = "#32D74B"; 
-                let accionHTML = "";
-                let mensajeDeuda = "Todo pagado";
-
-                if (ticketEncontrado.estado === 'multado') {
-                    colorEstado = "#FF00FF";
-                    mensajeDeuda = `DEBE MULTA: $${ticketEncontrado.pagoMulta}`;
-                    accionHTML = `<button class="btn-resolver-plan-b" data-id="${idTicketEncontrado}" style="background: #FF00FF; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">💵 Cobrar Efectivo y Abrir</button>`;
-                } else if (ticketEncontrado.estado === 'en_uso' || ticketEncontrado.estado === 'reservado') {
-                    colorEstado = "#FFD60A";
-                    mensajeDeuda = "Ticket en curso";
-                    accionHTML = `<button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: transparent; border: 2px solid var(--spot-selected); color: var(--spot-selected); padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">🚨 Forzar Apertura</button>`;
-                } else if (ticketEncontrado.estado === 'pagado') {
-                    accionHTML = `<button class="btn-abrir-plan-b" data-id="${idTicketEncontrado}" style="background: var(--success-neon); color: black; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;">✅ Ya pagó. Abrir Pluma</button>`;
-                }
-
-                divResultado.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-dark); padding-bottom: 10px;">
-                        <div>
-                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">CLIENTE</p>
-                            <strong style="color: white; font-size: 1.2rem;">${ticketEncontrado.nombre}</strong><br>
-                            <span style="color: var(--spot-selected); font-family: monospace;">${idTicketEncontrado}</span> | Placa: <strong>${ticketEncontrado.placa}</strong>
-                        </div>
-                        <div style="text-align: right;">
-                            <p style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">ESTADO</p>
-                            <strong style="color: ${colorEstado}; font-size: 1.1rem;">${mensajeDeuda}</strong><br>
-                            <span style="color: white; font-size: 0.9rem;">Cajón: ${ticketEncontrado.cajon}</span>
-                        </div>
-                    </div>
-                    <div style="margin-top: 15px;">${accionHTML}</div>
-                `;
-
-                const btnResolver = divResultado.querySelector('.btn-resolver-plan-b');
-                if (btnResolver) {
-                    btnResolver.addEventListener('click', () => {
-                        set(ref(db, `tickets_activos/${idTicketEncontrado}/estado`), 'pagado');
-                        set(ref(db, 'control_plumas/salida'), 'abrir');
-                        showToast("Pago registrado. Abriendo pluma...", "success");
-                        divResultado.innerHTML = `<p style="color: var(--success-neon); text-align: center; font-weight: bold;">Pluma abierta y pago resuelto.</p>`;
-                    });
-                }
-
-                const btnAbrir = divResultado.querySelector('.btn-abrir-plan-b');
-                if (btnAbrir) {
-                    btnAbrir.addEventListener('click', () => {
-                        set(ref(db, 'control_plumas/salida'), 'abrir');
-                        showToast("Señal enviada: Abriendo pluma", "info");
-                    });
-                }
-            }, 600); 
-        });
-    }
 });

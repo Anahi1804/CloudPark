@@ -1,47 +1,46 @@
-/* css/global.css */
+/* css/global.css - Tema Unificado Dark Tech OLED de Parkil */
 :root {
-    --primary: #1a73e8; /* Azul estilo Google/Material */
-    --primary-hover: #1557b0;
-    --bg-color: #f1f3f4;
-    --text-main: #202124;
-    --text-muted: #5f6368;
-    --surface: #ffffff;
-    --success: #1e8e3e;
-    --danger: #d93025;
-    --border: #dadce0;
+    --bg-app: #000000;
+    --bg-color: #000000;
+    --surface: #1C1C1E;
+    --surface-dark: #1C1C1E;
+    --surface-hover: #2C2C2E;
+    --border-dark: rgba(255, 255, 255, 0.08);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.12);
+
+    --text-main: #FFFFFF;
+    --text-muted: #8E8E93;
+
+    --primary: #0A84FF;
+    --primary-hover: #0070E0;
+    --spot-selected: #0A84FF;
+    --spot-available: #32D74B;
+    --spot-occupied: #FF453A;
+    --accent-yellow: #FFE600;
+    --accent-purple: #BF5AF2;
+
+    --success: #32D74B;
+    --success-neon: #32D74B;
+    --danger: #FF453A;
+    --danger-neon: #FF453A;
+    --accent-glow: rgba(10, 132, 255, 0.4);
 }
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-    background-color: var(--bg-color);
+    background-color: var(--bg-app);
     color: var(--text-main);
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Navbar Global */
-.navbar {
-    background-color: var(--surface);
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
-}
-
-.navbar .logo {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--primary);
-}
-
-/* Botones Globales */
 button {
     font-family: inherit;
 }
@@ -51,12 +50,12 @@ button {
     color: white;
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1rem;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
     width: 100%;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .btn-accion:hover {
@@ -64,15 +63,17 @@ button {
 }
 
 .btn-accion:disabled {
-    background-color: var(--border);
+    background-color: var(--surface-hover);
+    color: var(--text-muted);
     cursor: not-allowed;
 }
 
 /* Utilidades */
-.oculto { display: none !important; }
+.oculto {
+    display: none !important;
+}
 
-
-/* --- NUEVO: NOTIFICACIONES ELEGANTES (TOASTS) --- */
+/* Notificaciones Toast */
 #toast-container {
     position: fixed;
     bottom: 25px;
@@ -84,19 +85,20 @@ button {
 }
 
 .toast {
-    min-width: 250px;
-    padding: 16px 20px;
-    border-radius: 12px;
-    background: rgba(28, 28, 30, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    min-width: 260px;
+    padding: 15px 20px;
+    border-radius: 14px;
+    background: rgba(28, 28, 30, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: white;
     font-size: 0.95rem;
     font-weight: 600;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    border: 1px solid var(--border-dark);
     border-left: 5px solid transparent;
     transform: translateX(120%);
-    transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition: transform 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     display: flex;
     align-items: center;
     gap: 10px;

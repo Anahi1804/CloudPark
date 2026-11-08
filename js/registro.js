@@ -6,7 +6,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const mensajeRegistro = document.getElementById('mensaje-registro');
     const btnSubmit = formulario.querySelector('button');
 
-    // --- LÓGICA DEL OJITO (Exclusivo Registro) ---
+    const inputRol = document.getElementById('reg-rol');
+    const wrapperPlaca = document.getElementById('wrapper-placa');
+    const inputPlaca = document.getElementById('reg-placa');
+    const botonesRol = document.querySelectorAll('.opcion-rol');
+
+    // Selector entre Conductor y Administrador
+    botonesRol.forEach(btn => {
+        btn.addEventListener('click', () => {
+            botonesRol.forEach(b => b.classList.remove('activo'));
+            btn.classList.add('activo');
+            const rolElegido = btn.getAttribute('data-rol');
+            inputRol.value = rolElegido;
+
+            if (rolElegido === 'admin') {
+                wrapperPlaca.classList.add('oculto');
+                inputPlaca.removeAttribute('required');
+            } else {
+                wrapperPlaca.classList.remove('oculto');
+                inputPlaca.setAttribute('required', 'required');
+            }
+        });
+    });
+
+    // Ojito de contraseña
     const btnOjito = document.getElementById('btn-ojito-registro');
     const inputPassword = document.getElementById('reg-password');
 
@@ -24,77 +47,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function mostrarMensaje(mensaje, tipo) {
         mensajeRegistro.textContent = mensaje;
-        mensajeRegistro.className = 'mensaje-terminal'; 
+        mensajeRegistro.className = 'mensaje-terminal';
         mensajeRegistro.classList.add(tipo);
         mensajeRegistro.classList.remove('oculto');
     }
 
-    formulario.addEventListener('submit', (evento) => {
+    formulario.addEventListener('submit', async (evento) => {
         evento.preventDefault();
 
-        // 1. Obtener los datos del formulario
+        const rol = inputRol.value;
         const nombre = document.getElementById('reg-nombre').value.trim();
-        const placa = document.getElementById('reg-placa').value.trim().toUpperCase();
+        const placa = rol === 'admin' ? 'ADMIN-PRO' : inputPlaca.value.trim().toUpperCase();
         const correo = document.getElementById('reg-correo').value.trim();
-        const password = inputPassword.value; 
+        const password = inputPassword.value;
 
-        // --- VALIDACIONES ESTRICTAS ---
         const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!regexCorreo.test(correo)) {
             mostrarMensaje("Por favor, ingresa un correo electrónico válido.", "error");
-            return; // Detiene el código si está mal
+            return;
         }
 
-        const regexPlaca = /^[A-Z]{3,4}-\d{2,4}$/;
-        if (!regexPlaca.test(placa)) {
-            mostrarMensaje("La placa debe tener formato real (Ej. ABC-1234 o YZA-123)", "error");
-            return; // Detiene el código si está mal
+        if (rol === 'cliente') {
+            const regexPlaca = /^[A-Z]{3,4}-\d{2,4}$/;
+            if (!regexPlaca.test(placa)) {
+                mostrarMensaje("La placa debe tener formato válido (Ej. YZA-1234 o ABC-123).", "error");
+                return;
+            }
         }
-        // ---------------------------------
 
         btnSubmit.textContent = "Creando cuenta...";
         btnSubmit.disabled = true;
         mensajeRegistro.classList.add('oculto');
 
-        // 2. Crear la cuenta de autenticación en Firebase
-        createUserWithEmailAndPassword(auth, correo, password)
-            .then((credenciales) => {
-                const usuarioUID = credenciales.user.uid; 
+        try {
+            const credenciales = await createUserWithEmailAndPassword(auth, correo, password);
+            const usuarioUID = credenciales.user.uid;
 
-                // 3. Crear su "Expediente" en Firestore
-                const perfilRef = doc(firestoreDB, "usuarios", usuarioUID);
-                
-                const datosPerfil = {
-                    nombre: nombre,
-                    placa: placa,
-                    correo: correo,
-                    fechaRegistro: new Date().toLocaleString(),
-                    rol: "cliente" 
-                };
+            const datosPerfil = {
+                nombre: nombre,
+                placa: placa,
+                correo: correo,
+                fechaRegistro: new Date().toLocaleString(),
+                rol: rol
+            };
 
-                return setDoc(perfilRef, datosPerfil);
-            })
-            .then(() => {
-                mostrarMensaje("¡Cuenta creada con éxito! Ingresando...", "exito");
-                localStorage.setItem('usuarioLogueado', correo);
-                
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 1500);
-            })
-            .catch((error) => {
-                console.error("Error en el registro:", error);
-                
-                if (error.code === 'auth/email-already-in-use') {
-                    mostrarMensaje("Este correo ya está registrado.", "error");
-                } else if (error.code === 'auth/weak-password') {
-                    mostrarMensaje("La contraseña debe tener al menos 6 caracteres.", "error");
-                } else {
-                    mostrarMensaje("Error al crear la cuenta. Intenta de nuevo.", "error");
-                }
+            await setDoc(doc(firestoreDB, "usuarios", usuarioUID), datosPerfil);
 
-                btnSubmit.textContent = "Crear Cuenta";
-                btnSubmit.disabled = false;
-            });
+            mostrarMensaje("¡Cuenta creada con éxito! Ingresando...", "exito");
+            localStorage.setItem('usuarioLogueado', correo);
+            localStorage.setItem('nombreUsuario', nombre);
+            localStorage.setItem('placaUsuario', placa);
+            localStorage.setItem('rolUsuario', rol);
+
+            setTimeout(() => {
+                window.location.href = rol === 'admin' ? 'admin.html' : 'dashboard.html';
+            }, 1200);
+        } catch (error) {
+            console.error("Error en el registro:", error);
+            if (error.code === 'auth/email-already-in-use') {
+                mostrarMensaje("Este correo ya está registrado.", "error");
+            } else if (error.code === 'auth/weak-password') {
+                mostrarMensaje("La contraseña debe tener al menos 6 caracteres.", "error");
+            } else {
+                mostrarMensaje("Error al crear la cuenta. Intenta de nuevo.", "error");
+            }
+            btnSubmit.textContent = "Crear Cuenta";
+            btnSubmit.disabled = false;
+        }
     });
 });
