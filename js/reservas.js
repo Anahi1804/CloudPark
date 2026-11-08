@@ -1,118 +1,230 @@
-// js/reservas.js
-import { db, ref, onValue } from './firebase-config.js';
+// js/reservas.js - Renderizado Multi-Piso Dinámico y Sensores Híbridos (ESP32 + Virtuales)
+import { db, ref, onValue, PARKIL_CONFIG } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
     if (!usuarioLogueado) { window.location.href = '../index.html'; return; }
 
-    const btnSalir = document.getElementById('btn-salir');
-    if (btnSalir) {
-        btnSalir.addEventListener('click', () => {
-            localStorage.removeItem('usuarioLogueado');
-            window.location.href = '../index.html';
-        });
-    }
+    document.getElementById('btn-salir')?.addEventListener('click', () => {
+        localStorage.removeItem('usuarioLogueado');
+        window.location.href = '../index.html';
+    });
 
-    const cajonesElementos = document.querySelectorAll('.cajon');
+    const contenedorCajones = document.getElementById('contenedor-cajones');
+    const selectorPisosUI = document.getElementById('selector-pisos-user');
     const infoCajon = document.getElementById('info-cajon');
     const btnIrCarrito = document.getElementById('btn-ir-carrito');
+
+    const sedeId = localStorage.getItem('estacionamientoSeleccionadoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+    let pisoActual = 1;
     let cajonSeleccionado = null;
+    let sensorFisicoSeleccionado = "";
 
-    // --- VARIABLES DE LA MÁQUINA DE ESTADOS ---
-    let estadoFisico = {}; 
-    let infoTickets = {}; // Guardará el estado exacto de cada cajón
+    let estadoFisicoESP32 = {};
+    let sensoresVirtuales = JSON.parse(localStorage.getItem('parkil_sensores_virtuales') || '{}');
+    let infoTickets = {};
 
-    // 1. ESCUCHAR HARDWARE (ESP32)
-    const estacionamientoRef = ref(db, 'estacionamiento_actual');
-    onValue(estacionamientoRef, (snapshot) => {
-        estadoFisico = snapshot.val() || {};
-        procesarMapa(); 
-    });
+    // Plantilla de respaldo si aún no se ha abierto el Admin en este navegador
+    const pisoRespaldo = {
+        columnas: 5,
+        filas: 4,
+        celdas: [
+            { tipo: "entrada", etiqueta: "ENTRADA" },
+            { tipo: "calle", etiqueta: "→" },
+            { tipo: "calle", etiqueta: "→" },
+            { tipo: "elevador", etiqueta: "ELEVADOR" },
+            { tipo: "escalera", etiqueta: "ESCALERA" },
+            { tipo: "cajon", codigo: "A1", sensorFisico: "cajon_1" },
+            { tipo: "cajon", codigo: "A2", sensorFisico: "cajon_2" },
+            { tipo: "cajon", codigo: "A3", sensorFisico: "cajon_3" },
+            { tipo: "discapacitado", codigo: "E1", sensorFisico: "" },
+            { tipo: "calle", etiqueta: "↓" },
+            { tipo: "cajon", codigo: "B1", sensorFisico: "cajon_4" },
+            { tipo: "cajon", codigo: "B2", sensorFisico: "cajon_5" },
+            { tipo: "cajon", codigo: "B3", sensorFisico: "cajon_6" },
+            { tipo: "discapacitado", codigo: "E2", sensorFisico: "" },
+            { tipo: "calle", etiqueta: "↓" },
+            { tipo: "calle", etiqueta: "←" },
+            { tipo: "calle", etiqueta: "←" },
+            { tipo: "calle", etiqueta: "←" },
+            { tipo: "calle", etiqueta: "←" },
+            { tipo: "salida", etiqueta: "SALIDA" }
+        ]
+    };
 
-    // 2. ESCUCHAR COMPRAS (NUBE)
-    const ticketsRef = ref(db, 'tickets_activos');
-    onValue(ticketsRef, (snapshot) => {
-        const tickets = snapshot.val() || {};
-        infoTickets = {}; // Limpiamos la memoria
-        for (let id in tickets) {
-            infoTickets[tickets[id].cajon] = tickets[id].estado;
+    let catalogoSedes = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || '{}');
+    let sedeActual = catalogoSedes[sedeId] || {
+        id: sedeId,
+        nombre: localStorage.getItem('estacionamientoSeleccionadoNombre') || "Parkil Centro Histórico",
+        tarifaHora: Number(localStorage.getItem('tarifaHoraSeleccionada')) || 25,
+        niveles: 2,
+        pisos: { "1": pisoRespaldo, "2": pisoRespaldo }
+    };
+
+    document.getElementById('nombre-sede-header').textContent = sedeActual.nombre;
+
+    function renderizarBotonesPisos() {
+        selectorPisosUI.innerHTML = '';
+        const niveles = Number(sedeActual.niveles) || 1;
+        for (let p = 1; p <= niveles; p++) {
+            const btn = document.createElement('button');
+            btn.className = `btn-piso-user ${p === pisoActual ? 'activo' : ''}`;
+            btn.textContent = `Nivel ${p}`;
+            btn.addEventListener('click', () => {
+                pisoActual = p;
+                resetearSeleccion();
+                renderizarBotonesPisos();
+                dibujarPlano();
+            });
+            selectorPisosUI.appendChild(btn);
         }
-        procesarMapa(); 
-    });
-
-    // 3. LA LÓGICA DE MATRIZ DE ESTADOS
-    function procesarMapa() {
-        const equivalencias = {
-            'A1': estadoFisico.cajon_1, 'A2': estadoFisico.cajon_2, 'A3': estadoFisico.cajon_3,
-            'B1': estadoFisico.cajon_4, 'B2': estadoFisico.cajon_5, 'B3': estadoFisico.cajon_6
-        };
-
-        cajonesElementos.forEach(cajon => {
-            const numero = cajon.querySelector('.numero-cajon').textContent;
-            const estadoSensor = equivalencias[numero]; 
-            const estadoTicket = infoTickets[numero]; 
-
-            cajon.classList.remove('disponible', 'ocupado', 'reservado', 'en-camino', 'seleccionado');
-
-            // LÓGICA DE ESTADOS ACTUALIZADA
-            if (estadoSensor === 'ocupado') {
-                cajon.classList.add('ocupado');
-                if (cajonSeleccionado === numero) resetearSeleccion();
-            } 
-            //  CORRECCIÓN AQUÍ: Agregamos "pagado" a los estados de tránsito (En camino)
-            else if (estadoTicket === 'en_uso' || estadoTicket === 'multado' || estadoTicket === 'pagado') {
-                cajon.classList.add('en-camino'); // Morado (Yendo al cajón O yendo a la salida)
-                if (cajonSeleccionado === numero) resetearSeleccion();
-            }
-
-            else if (estadoTicket === 'reservado') {
-                cajon.classList.add('reservado'); // Amarillo
-                if (cajonSeleccionado === numero) resetearSeleccion();
-            } 
-
-            else {
-                cajon.classList.add('disponible'); // Verde
-                if (cajonSeleccionado === numero) cajon.classList.add('seleccionado');
-            }
-        });
     }
 
-    // 4. Lógica de clics
-    cajonesElementos.forEach(cajon => {
-        cajon.addEventListener('click', () => {
-            // Bloqueamos la selección si el cajón no está disponible
-            // Ahora también bloqueamos 'en-camino'
-            if (cajon.classList.contains('ocupado') || 
-                cajon.classList.contains('reservado') || 
-                cajon.classList.contains('en-camino')) {
-                return; 
+    function obtenerEstadoSensor(celda) {
+        if (celda.sensorFisico) {
+            return String(estadoFisicoESP32[celda.sensorFisico] || 'libre').trim().toLowerCase();
+        }
+        const virtSede = sensoresVirtuales[sedeActual.id] || {};
+        return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();
+    }
+
+    function dibujarPlano() {
+        const datosPiso = (sedeActual.pisos && sedeActual.pisos[String(pisoActual)]) || pisoRespaldo;
+        contenedorCajones.style.gridTemplateColumns = `repeat(${datosPiso.columnas || 3}, 1fr)`;
+        contenedorCajones.innerHTML = '';
+
+        datosPiso.celdas.forEach(celda => {
+            if (celda.tipo === 'vacio') {
+                const vacio = document.createElement('div');
+                contenedorCajones.appendChild(vacio);
+                return;
+            }
+            if (celda.tipo === 'calle') {
+                const calle = document.createElement('div');
+                calle.className = 'celda-calle';
+                calle.textContent = celda.etiqueta || '🛣️';
+                contenedorCajones.appendChild(calle);
+                return;
+            }
+            if (celda.tipo === 'elevador' || celda.tipo === 'escalera' || celda.tipo === 'entrada' || celda.tipo === 'salida') {
+                const iconos = {
+                    elevador: '🛗<br>ELEVADOR',
+                    escalera: '🪜<br>ESCALERA',
+                    entrada: '🚧<br>ENTRADA',
+                    salida: '🏁<br>SALIDA'
+                };
+                const poi = document.createElement('div');
+                poi.className = 'celda-poi';
+                poi.innerHTML = iconos[celda.tipo];
+                contenedorCajones.appendChild(poi);
+                return;
             }
 
-            cajonesElementos.forEach(c => c.classList.remove('seleccionado'));
-            cajon.classList.add('seleccionado');
-            cajon.classList.add('seleccionado');
-            cajonSeleccionado = cajon.querySelector('.numero-cajon').textContent;
+            // Es un cajón (normal o discapacitado)
+            const numero = celda.codigo;
+            const estadoSensor = obtenerEstadoSensor(celda);
+            const estadoTicket = infoTickets[numero];
+            const esDisc = celda.tipo === 'discapacitado';
 
-            infoCajon.innerHTML = `
-                <p class="etiqueta-info">Cajón seleccionado:</p>
-                <p class="valor-info cyan-glow">${cajonSeleccionado}</p>
-            `;
-            btnIrCarrito.disabled = false;
+            const divCajon = document.createElement('div');
+            divCajon.className = 'cajon';
+            divCajon.style.fontSize = datosPiso.columnas >= 5 ? '1rem' : '1.3rem';
+
+            if (estadoSensor === 'ocupado') {
+                divCajon.classList.add('ocupado');
+                if (cajonSeleccionado === numero) resetearSeleccion();
+            } else if (estadoTicket === 'en_uso' || estadoTicket === 'multado' || estadoTicket === 'pagado') {
+                divCajon.classList.add('en-camino');
+                if (cajonSeleccionado === numero) resetearSeleccion();
+            } else if (estadoTicket === 'reservado') {
+                divCajon.classList.add('reservado');
+                if (cajonSeleccionado === numero) resetearSeleccion();
+            } else {
+                divCajon.classList.add('disponible');
+                if (esDisc) divCajon.classList.add('discapacitado-libre');
+                if (cajonSeleccionado === numero) divCajon.classList.add('seleccionado');
+            }
+
+            divCajon.innerHTML = `<span class="numero-cajon">${esDisc ? '♿ ' : ''}${numero}</span>`;
+
+            divCajon.addEventListener('click', () => {
+                if (divCajon.classList.contains('ocupado') ||
+                    divCajon.classList.contains('reservado') ||
+                    divCajon.classList.contains('en-camino')) {
+                    return;
+                }
+                cajonSeleccionado = numero;
+                sensorFisicoSeleccionado = celda.sensorFisico || "";
+                dibujarPlano();
+
+                infoCajon.innerHTML = `
+                    <p class="etiqueta-info">${esDisc ? '♿ Cajón Preferente Seleccionado:' : '🚗 Cajón Seleccionado:'}</p>
+                    <p class="valor-info cyan-glow">${numero}</p>
+                    <small style="color: var(--text-muted); display:block; margin-top:4px;">Nivel ${pisoActual} • Tarifa: $${sedeActual.tarifaHora || 25}/hr</small>
+                `;
+                btnIrCarrito.disabled = false;
+            });
+
+            contenedorCajones.appendChild(divCajon);
         });
-    });
+    }
 
     function resetearSeleccion() {
         cajonSeleccionado = null;
-        infoCajon.innerHTML = `<p class="etiqueta-info">Estado actual:</p><p class="valor-info" style="font-size: 1.2rem; color: var(--text-muted);">Esperando selección...</p>`;
+        sensorFisicoSeleccionado = "";
+        infoCajon.innerHTML = `<p class="etiqueta-info">Estado actual:</p><p class="valor-info" style="font-size: 1.15rem; color: var(--text-muted);">Toca un cajón disponible...</p>`;
         btnIrCarrito.disabled = true;
     }
 
-    if (btnIrCarrito) {
-        btnIrCarrito.addEventListener('click', () => {
-            if (cajonSeleccionado) {
-                localStorage.setItem('cajonTemporal', cajonSeleccionado);
-                window.location.href = 'carrito.html';
+    renderizarBotonesPisos();
+    dibujarPlano();
+
+    // Escuchar Hardware real ESP32
+    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
+        estadoFisicoESP32 = snapshot.val() || {};
+        dibujarPlano();
+    });
+
+    // Escuchar Sensores Virtuales
+    onValue(ref(db, 'sensores_virtuales'), (snapshot) => {
+        if (snapshot.exists()) {
+            sensoresVirtuales = snapshot.val();
+            dibujarPlano();
+        }
+    });
+
+    // Escuchar planos actualizados por el Admin
+    onValue(ref(db, `estacionamientos_red/${sedeId}`), (snapshot) => {
+        if (snapshot.exists()) {
+            sedeActual = snapshot.val();
+            document.getElementById('nombre-sede-header').textContent = sedeActual.nombre;
+            renderizarBotonesPisos();
+            dibujarPlano();
+        }
+    });
+
+    // Escuchar tickets activos
+    onValue(ref(db, 'tickets_activos'), (snapshot) => {
+        const tickets = snapshot.val() || {};
+        infoTickets = {};
+        for (let id in tickets) {
+            const t = tickets[id];
+            if (!t.estacionamientoId || t.estacionamientoId === sedeActual.id) {
+                infoTickets[t.cajon] = t.estado;
             }
-        });
-    }
+        }
+        dibujarPlano();
+    });
+
+    btnIrCarrito?.addEventListener('click', () => {
+        if (cajonSeleccionado) {
+            localStorage.setItem('cajonTemporal', cajonSeleccionado);
+            localStorage.setItem('sensorFisicoTemporal', sensorFisicoSeleccionado);
+            localStorage.setItem('pisoTemporal', String(pisoActual));
+            localStorage.setItem('estacionamientoSeleccionadoId', sedeActual.id);
+            localStorage.setItem('estacionamientoSeleccionadoNombre', sedeActual.nombre);
+            localStorage.setItem('tarifaHoraSeleccionada', String(sedeActual.tarifaHora || 25));
+            window.location.href = 'carrito.html';
+        }
+    });
 });

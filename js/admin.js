@@ -439,14 +439,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- PESTAÑA 2: MAPA SIN API KEY (OPENSTREETMAP OFICIAL) ---
+// Reemplaza únicamente la función inicializarMapaLeaflet() en tu js/admin.js por esta:
     function inicializarMapaLeaflet() {
         const sede = catalogoEstacionamientos[estacionamientoActivoId] || crearEstacionamientoPorDefecto();
         const lat = Number(sede.lat) || 19.8454;
         const lng = Number(sede.lng) || -90.5358;
 
+        async function obtenerDireccionDesdeCoordenadas(latitud, longitud) {
+            document.getElementById('est-lat').value = latitud.toFixed(6);
+            document.getElementById('est-lng').value = longitud.toFixed(6);
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitud}&lon=${longitud}`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    // Recorta la dirección para dejar calle, barrio y ciudad limpios
+                    const partes = data.display_name.split(',').slice(0, 4).join(', ');
+                    document.getElementById('est-direccion').value = partes;
+                }
+            } catch (err) {
+                console.warn("No se pudo autocompletar el nombre de la calle:", err);
+            }
+        }
+
         if (!mapaLeaflet) {
             mapaLeaflet = L.map('mapa-admin-leaflet').setView([lat, lng], 15);
-            // Servidor público oficial de OpenStreetMap (NO requiere API Key jamás)
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap'
@@ -455,16 +471,13 @@ document.addEventListener('DOMContentLoaded', () => {
             marcadorLeaflet = L.marker([lat, lng], { draggable: true }).addTo(mapaLeaflet);
 
             mapaLeaflet.on('click', (e) => {
-                const { lat, lng } = e.latlng;
-                marcadorLeaflet.setLatLng([lat, lng]);
-                document.getElementById('est-lat').value = lat.toFixed(6);
-                document.getElementById('est-lng').value = lng.toFixed(6);
+                marcadorLeaflet.setLatLng([e.latlng.lat, e.latlng.lng]);
+                obtenerDireccionDesdeCoordenadas(e.latlng.lat, e.latlng.lng);
             });
 
             marcadorLeaflet.on('dragend', () => {
                 const pos = marcadorLeaflet.getLatLng();
-                document.getElementById('est-lat').value = pos.lat.toFixed(6);
-                document.getElementById('est-lng').value = pos.lng.toFixed(6);
+                obtenerDireccionDesdeCoordenadas(pos.lat, pos.lng);
             });
         } else {
             mapaLeaflet.invalidateSize();

@@ -156,19 +156,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     nombre: localStorage.getItem('nombreUsuario') || "Usuario",
                     placa: localStorage.getItem('placaUsuario') || "S/N",
                     cajon: cajonSeleccionado,
+                    piso: localStorage.getItem('pisoTemporal') || "1",
+                    sensorFisico: localStorage.getItem('sensorFisicoTemporal') || "",
+                    estacionamientoId: localStorage.getItem('estacionamientoSeleccionadoId') || "parkil_central_campeche",
+                    estacionamientoNombre: localStorage.getItem('estacionamientoSeleccionadoNombre') || "Parkil Centro Histórico",
+                    tarifaHora: parseFloat(localStorage.getItem('tarifaHoraSeleccionada') || 25),
                     paquete: paqueteFinal,
                     minutosComprados: minutosFinales,
-                    pagoReserva: precioFinal, 
+                    pagoReserva: precioFinal,
                     pagoEstacionamiento: 0,
                     pagoMulta: 0,
                     granTotal: precioFinal,
-                    totalLiquidado: precioFinal, 
-                    totalPagado: precioFinal, 
+                    totalLiquidado: precioFinal,
+                    totalPagado: precioFinal,
                     codigo: codigoGenerado,
-                    timestampCompra: ahora.getTime(), 
+                    timestampCompra: ahora.getTime(),
                     timestampExpiracion: fechaExpiracion.getTime(),
                     fechaTexto: ahora.toLocaleString(),
-                    estado: "reservado" 
+                    estado: "reservado"
                 };
 
                 const ticketRef = ref(db, 'tickets_activos/' + codigoGenerado);

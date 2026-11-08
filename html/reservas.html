@@ -3,20 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Reservar Lugar - CloudPark</title>
+    <title>Seleccionar Cajón - Parkil</title>
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/reservas.css">
+    <link rel="icon" type="image/png" href="../icono-parkil.png?v=3">
+    <style>
+        .pisos-selector-bar {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 1.2rem;
+        }
+        .btn-piso-user {
+            background: #000;
+            color: var(--text-muted);
+            border: 1px solid var(--border-dark);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-piso-user.activo {
+            background: var(--spot-selected);
+            color: #fff;
+            border-color: var(--spot-selected);
+            box-shadow: 0 0 12px rgba(10, 132, 255, 0.4);
+        }
+        .celda-poi {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-align: center;
+            padding: 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #d4d4d8;
+        }
+        .celda-calle {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #09090c;
+            border: 1px dashed rgba(255,255,255,0.06);
+            color: #52525b;
+            font-size: 0.75rem;
+        }
+        .cajon.discapacitado-libre {
+            border-color: #0A84FF;
+            background: rgba(10, 132, 255, 0.1);
+            color: #60a5fa;
+        }
+    </style>
 </head>
 <body class="bg-app">
     <main class="mobile-container layout-fluido">
-        
         <header class="app-header">
             <a href="dashboard.html" class="btn-volver" title="Volver">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </a>
             <div class="header-titulo">
-                <h2>Mapa de Cajones</h2>
-                <p>Selecciona tu espacio</p>
+                <h2 id="nombre-sede-header">Mapa de Cajones</h2>
+                <p id="subtitulo-piso-header">Selecciona tu nivel y espacio</p>
             </div>
             <button id="btn-salir" class="btn-cerrar" title="Cerrar Sesión">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -25,46 +81,29 @@
 
         <div class="layout-reservas">
             <section class="estacionamiento tarjeta-oscura">
-                
-                <div class="indicadores" style="flex-wrap: wrap; gap: 1rem;">
-                    <span class="tag disponible"><div class="punto"></div> Disponible</span>
+                <!-- Selector de Pisos / Niveles -->
+                <div id="selector-pisos-user" class="pisos-selector-bar"></div>
+
+                <div class="indicadores" style="flex-wrap: wrap; gap: 0.8rem;">
+                    <span class="tag disponible"><div class="punto"></div> Libre</span>
                     <span class="tag reservado"><div class="punto"></div> Reservado</span>
-                    <span class="tag en-camino"><div class="punto"></div> En camino</span>
+                    <span class="tag en-camino"><div class="punto"></div> En tránsito</span>
                     <span class="tag ocupado"><div class="punto"></div> Ocupado</span>
+                    <span class="tag"><div class="punto" style="background:#0A84FF;"></div> ♿ Preferente</span>
                 </div>
                 
-                <div id="contenedor-cajones" class="grid-estacionamiento">
-                    <div class="cajon disponible">
-                        <span class="numero-cajon">A1</span>
-                    </div>
-                    <div class="cajon ocupado">
-                        <span class="numero-cajon">A2</span>
-                    </div>
-                    <div class="cajon disponible">
-                        <span class="numero-cajon">A3</span>
-                    </div>
-                <div class="cajon disponible">
-                    <span class="numero-cajon">B1</span>
-                </div>
-                <div class="cajon ocupado">
-                    <span class="numero-cajon">B2</span>
-                </div>
-                <div class="cajon disponible">
-                    <span class="numero-cajon">B3</span>
-                </div>
-            </div>
-        </section>
+                <!-- Cuadrícula Dinámica del Piso -->
+                <div id="contenedor-cajones" class="grid-estacionamiento"></div>
+            </section>
 
-        <aside class="panel-control tarjeta-oscura">
-            <h3 class="titulo-panel">Detalles de Reserva</h3>
-            
-            <div id="info-cajon" class="info-box">
-                <p class="etiqueta-info">Estado actual:</p>
-                <p class="valor-info" style="font-size: 1.2rem; color: var(--text-muted);">Esperando selección...</p>
-            </div>
-
-            <button id="btn-ir-carrito" class="btn-accion btn-neon" disabled>Continuar al Pago</button>
-        </aside>
+            <aside class="panel-control tarjeta-oscura">
+                <h3 class="titulo-panel">Detalles de Reserva</h3>
+                <div id="info-cajon" class="info-box">
+                    <p class="etiqueta-info">Estado actual:</p>
+                    <p class="valor-info" style="font-size: 1.15rem; color: var(--text-muted);">Toca un cajón disponible...</p>
+                </div>
+                <button id="btn-ir-carrito" class="btn-accion btn-neon" disabled>Continuar al Pago</button>
+            </aside>
         </div>
     </main>
 
