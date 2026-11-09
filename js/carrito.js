@@ -47,8 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const localCat = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || '{}');
             let sede = localCat[sedeId];
 
-            const snap = await get(ref(db, `estacionamientos_red/${sedeId}`));
-            if (snap.exists()) sede = snap.val();
+const snapCfg = await getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_sedes"));
+            if (snapCfg.exists() && snapCfg.data().sedes && snapCfg.data().sedes[sedeId]) {
+                sede = snapCfg.data().sedes[sedeId];
+            }
 
             if (sede) {
                 configSede.tarifaHora = Number(sede.tarifaHora ?? 25);

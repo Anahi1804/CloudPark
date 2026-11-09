@@ -644,7 +644,16 @@ function obtenerEstadoSensorCajon(celda) {
                 }
             }
 
-            const badgeHW = celda.sensorFisico ? `<span class="badge-sensor-hw" title="Conectado a ${celda.sensorFisico}">HW</span>` : '';
+            const sensorVinculado = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[codigo] || '';
+            const badgeHW = sensorVinculado ? `<span class="badge-sensor-hw" title="Conectado a ${sensorVinculado}">HW</span>` : '';
+
+            html += `
+                <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${sensorVinculado}" style="position:relative; min-height: 68px; background: ${colorFondo}; border: 2px solid ${colorBorde}; border-radius: 10px; padding: 0.6rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s;">
+                    ${badgeHW}
+                    <strong style="color: #fff; font-size: 1.05rem;">${esDisc ? '♿ ' : ''}${codigo}</strong><br>
+                    <span style="font-size: 0.65rem; color: ${colorTexto}; font-weight: 800;">${etiqueta}</span>
+                </div>
+            `;
 
             html += `
                 <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${celda.sensorFisico || ''}" style="position:relative; min-height: 68px; background: ${colorFondo}; border: 2px solid ${colorBorde}; border-radius: 10px; padding: 0.6rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s;">
@@ -897,15 +906,21 @@ function obtenerEstadoSensorCajon(celda) {
     });
 
     // --- ESCUCHAS EN TIEMPO REAL ---
-    onValue(ref(db, 'estacionamientos_red'), (snapshot) => {
-        const nube = snapshot.val();
-        if (nube && Object.keys(nube).length > 0) {
-            catalogoGlobal = asegurarSucursalesSimuladasRed(nube);
-            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoGlobal));
-            actualizarSelectorSedes();
-            renderizarPillsMonitor();
-            dibujarMapaAdmin();
+// Borra onValue(ref(db, 'estacionamientos_red')...) y deja así el de sensores físicos:
+    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
+        adminEstadoFisico = snapshot.val() || {};
+        console.log("📡 Lectura ESP32 en vivo:", adminEstadoFisico);
+
+        for (let idTicket in adminTicketsActivos) {
+            const t = adminTicketsActivos[idTicket];
+            if (t.estado === 'en_uso' && !t.timestampIngresoFisico) {
+                const sensorId = t.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[t.cajon];
+                if (sensorId && String(adminEstadoFisico[sensorId] || '').trim().toLowerCase() === 'ocupado') {
+                    update(ref(db, `tickets_activos/${idTicket}`), { timestampIngresoFisico: Date.now() });
+                }
+            }
         }
+        dibujarMapaAdmin();
     });
 
     onValue(ref(db, 'tickets_activos'), (snapshot) => {

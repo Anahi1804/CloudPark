@@ -164,12 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarSedesEnMapaYLista();
 
     // Escuchar si el Admin agrega o modifica estacionamientos en Firebase
-    onValue(ref(db, 'estacionamientos_red'), (snap) => {
-        const data = snap.val();
-        if (data && Object.keys(data).length > 0) {
-            catalogoSedes = data;
-            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(data));
+getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_sedes")).then((docSnap) => {
+        if (docSnap.exists() && docSnap.data().sedes) {
+            catalogoSedes = docSnap.data().sedes;
+            localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoSedes));
             renderizarSedesEnMapaYLista();
         }
-    });
+    }).catch(() => {});
 });

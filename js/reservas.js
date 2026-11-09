@@ -181,18 +181,10 @@ function obtenerEstadoSensor(celda) {
     dibujarPlano();
 
     // Escuchar Hardware real ESP32
-    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
-        estadoFisicoESP32 = snapshot.val() || {};
-        dibujarPlano();
-    });
+
 
     // Escuchar Sensores Virtuales
-    onValue(ref(db, 'sensores_virtuales'), (snapshot) => {
-        if (snapshot.exists()) {
-            sensoresVirtuales = snapshot.val();
-            dibujarPlano();
-        }
-    });
+
 
     // Escuchar planos actualizados por el Admin
     onValue(ref(db, `estacionamientos_red/${sedeId}`), (snapshot) => {
