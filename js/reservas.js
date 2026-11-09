@@ -81,14 +81,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 function obtenerEstadoSensor(celda, sensorAutoAsignado = '') {
+        // Vinculación automática: si es el Nivel 1, los primeros cajones toman cajon_1 a cajon_6 por defecto
         const sensorHw = celda.sensorFisico || sensorAutoAsignado || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
+        
         if (sensorHw && estadoFisicoESP32 && estadoFisicoESP32[sensorHw] !== undefined) {
             return String(estadoFisicoESP32[sensorHw]).trim().toLowerCase();
         }
+        
+        // Si no es hardware real, revisa los sensores virtuales de esta sucursal en la nube
         const virtSede = sensoresVirtuales[sedeActual.id] || {};
         return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();
     }
-
+    
     function dibujarPlano() {
         const datosPiso = (sedeActual.pisos && sedeActual.pisos[String(pisoActual)]) || pisoRespaldo;
         contenedorCajones.style.gridTemplateColumns = `repeat(${datosPiso.columnas || 3}, 1fr)`;
