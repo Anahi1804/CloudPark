@@ -572,9 +572,8 @@ function guardarCatalogoEnNubeYLocal() {
         }
     }
 
-function obtenerEstadoSensorCajon(celda) {
-        // Si el cajón es A1, A2, A3, B1, B2 o B3, usa siempre su sensor físico de la maqueta por defecto
-        const sensorHw = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
+function obtenerEstadoSensorCajon(celda, sensorAutoAsignado = '') {
+        const sensorHw = celda.sensorFisico || sensorAutoAsignado || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
         if (sensorHw && adminEstadoFisico && adminEstadoFisico[sensorHw] !== undefined) {
             return String(adminEstadoFisico[sensorHw]).trim().toLowerCase();
         }
@@ -599,67 +598,92 @@ function obtenerEstadoSensorCajon(celda) {
             }
         }
 
-        let html = `<div style="display: grid; grid-template-columns: repeat(${datosPiso.columnas}, minmax(72px, 1fr)); gap: 10px;">`;
+        let html = `<div style="display: grid; grid-template-columns: repeat(${datosPiso.columnas}, minmax(72px, 1fr)); gap: 12px;">`;
+
+        // Contador para vincular automáticamente los primeros 6 cajones del Piso 1 a cajon_1..cajon_6
+        let contadorSensorMaqueta = 1;
+        let contadorNombreUnico = 1;
 
         datosPiso.celdas.forEach((celda) => {
             if (celda.tipo === 'vacio') {
-                html += `<div style="min-height: 68px; border-radius: 8px;"></div>`;
+                html += `<div style="min-height: 72px; border-radius: 10px;"></div>`;
                 return;
             }
             if (celda.tipo === 'calle') {
-                html += `<div style="min-height: 68px; border-radius: 8px; background: #0d0d10; border: 1px dashed rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; color:#71717a; font-size:0.8rem;">🛣️ ${celda.etiqueta || ''}</div>`;
+                html += `<div style="min-height: 72px; border-radius: 10px; background: #0d0d10; border: 1px dashed rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; color:#71717a; font-size:0.85rem;">🛣️ ${celda.etiqueta || ''}</div>`;
                 return;
             }
             if (celda.tipo === 'elevador' || celda.tipo === 'escalera' || celda.tipo === 'entrada' || celda.tipo === 'salida') {
                 const iconos = { elevador: '🛗 ELEVADOR', escalera: '🪜 ESCALERA', entrada: '🚧 ENTRADA', salida: '🏁 SALIDA' };
-                html += `<div style="min-height: 68px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#e4e4e7; padding:4px;">${iconos[celda.tipo]}</div>`;
+                html += `<div style="min-height: 72px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#e4e4e7; padding:4px;">${iconos[celda.tipo]}</div>`;
                 return;
             }
 
-            const codigo = celda.codigo;
-            const estadoSensor = obtenerEstadoSensorCajon(celda);
+            // Asignar sensor físico automático a los primeros 6 cajones del Piso 1 si no tienen uno
+            let sensorAuto = '';
+            if (pisoMonitorActual === 1 && contadorSensorMaqueta <= 6) {
+                sensorAuto = `cajon_${contadorSensorMaqueta}`;
+                contadorSensorMaqueta++;
+            }
+
+            const sensorVinculado = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo] || sensorAuto;
+            const codigo = celda.codigo || `C${contadorNombreUnico}`;
+            contadorNombreUnico++;
+
+            const estadoSensor = obtenerEstadoSensorCajon(celda, sensorVinculado);
             const ticketInfo = infoPorCajon[codigo];
             const esDisc = celda.tipo === 'discapacitado';
 
-            let colorFondo = esDisc ? 'rgba(10, 132, 255, 0.1)' : 'rgba(50, 215, 75, 0.08)';
-            let colorBorde = esDisc ? '#0A84FF' : 'rgba(50, 215, 75, 0.45)';
+            // Colores Neón Brillantes (Estilo original mejorado)
+            let colorFondo = esDisc ? 'rgba(10, 132, 255, 0.12)' : 'rgba(50, 215, 75, 0.10)';
+            let colorBorde = esDisc ? '#0A84FF' : '#32D74B';
             let colorTexto = esDisc ? '#60a5fa' : '#32D74B';
             let etiqueta = esDisc ? '♿ LIBRE' : 'LIBRE';
+            let brillo = esDisc ? '0 0 12px rgba(10, 132, 255, 0.25)' : '0 0 12px rgba(50, 215, 75, 0.2)';
 
             if (estadoSensor === 'ocupado') {
                 if (ticketInfo && ticketInfo.estado === 'multado') {
-                    colorFondo = 'rgba(255, 0, 255, 0.14)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTADO';
-                } else if (!ticketInfo || ticketInfo.estado === 'reservado') {
-                    colorFondo = 'rgba(255, 149, 0, 0.18)'; colorBorde = '#FF9500'; colorTexto = '#FF9500'; etiqueta = 'OBSTRUIDO';
+                    colorFondo = 'rgba(255, 0, 255, 0.18)';
+                    colorBorde = '#FF00FF';
+                    colorTexto = '#FF00FF';
+                    etiqueta = 'MULTADO';
+                    brillo = '0 0 18px rgba(255, 0, 255, 0.5)';
                 } else {
-                    colorFondo = 'rgba(255, 69, 58, 0.18)'; colorBorde = '#FF453A'; colorTexto = '#FF453A'; etiqueta = 'OCUPADO';
+                    colorFondo = 'rgba(255, 69, 58, 0.22)';
+                    colorBorde = '#FF453A';
+                    colorTexto = '#FF453A';
+                    etiqueta = 'OCUPADO';
+                    brillo = '0 0 18px rgba(255, 69, 58, 0.5)';
                 }
             } else if (ticketInfo) {
                 if (ticketInfo.estado === 'multado') {
-                    colorFondo = 'rgba(255, 0, 255, 0.12)'; colorBorde = '#FF00FF'; colorTexto = '#FF00FF'; etiqueta = 'MULTA';
+                    colorFondo = 'rgba(255, 0, 255, 0.15)';
+                    colorBorde = '#FF00FF';
+                    colorTexto = '#FF00FF';
+                    etiqueta = 'MULTA';
+                    brillo = '0 0 15px rgba(255, 0, 255, 0.4)';
                 } else if (ticketInfo.estado === 'en_uso' || ticketInfo.estado === 'pagado') {
-                    colorFondo = 'rgba(191, 90, 242, 0.15)'; colorBorde = '#BF5AF2'; colorTexto = '#BF5AF2'; etiqueta = 'EN TRÁNSITO';
+                    colorFondo = 'rgba(191, 90, 242, 0.18)';
+                    colorBorde = '#BF5AF2';
+                    colorTexto = '#BF5AF2';
+                    etiqueta = 'EN TRÁNSITO';
+                    brillo = '0 0 16px rgba(191, 90, 242, 0.45)';
                 } else if (ticketInfo.estado === 'reservado') {
-                    colorFondo = 'rgba(255, 214, 10, 0.14)'; colorBorde = '#FFD60A'; colorTexto = '#FFD60A'; etiqueta = 'RESERVADO';
+                    colorFondo = 'rgba(255, 214, 10, 0.18)';
+                    colorBorde = '#FFD60A';
+                    colorTexto = '#FFD60A';
+                    etiqueta = 'RESERVADO';
+                    brillo = '0 0 16px rgba(255, 214, 10, 0.4)';
                 }
             }
 
-            const sensorVinculado = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[codigo] || '';
-            const badgeHW = sensorVinculado ? `<span class="badge-sensor-hw" title="Conectado a ${sensorVinculado}">HW</span>` : '';
+            const badgeHW = sensorVinculado ? `<span class="badge-sensor-hw" title="Conectado a ${sensorVinculado}">${sensorVinculado.replace('cajon_', 'S')}</span>` : '';
 
             html += `
-                <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${sensorVinculado}" style="position:relative; min-height: 68px; background: ${colorFondo}; border: 2px solid ${colorBorde}; border-radius: 10px; padding: 0.6rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s;">
+                <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${sensorVinculado}" style="position:relative; min-height: 72px; background: ${colorFondo}; border: 2px solid ${colorBorde}; box-shadow: ${brillo}; border-radius: 12px; padding: 0.65rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.25s ease;">
                     ${badgeHW}
-                    <strong style="color: #fff; font-size: 1.05rem;">${esDisc ? '♿ ' : ''}${codigo}</strong><br>
-                    <span style="font-size: 0.65rem; color: ${colorTexto}; font-weight: 800;">${etiqueta}</span>
-                </div>
-            `;
-
-            html += `
-                <div class="cajon-admin" data-cajon="${codigo}" data-sensor="${celda.sensorFisico || ''}" style="position:relative; min-height: 68px; background: ${colorFondo}; border: 2px solid ${colorBorde}; border-radius: 10px; padding: 0.6rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s;">
-                    ${badgeHW}
-                    <strong style="color: #fff; font-size: 1.05rem;">${esDisc ? '♿ ' : ''}${codigo}</strong><br>
-                    <span style="font-size: 0.65rem; color: ${colorTexto}; font-weight: 800;">${etiqueta}</span>
+                    <strong style="color: #fff; font-size: 1.15rem;">${esDisc ? '♿ ' : ''}${codigo}</strong><br>
+                    <span style="font-size: 0.68rem; color: ${colorTexto}; font-weight: 800; letter-spacing: 0.5px;">${etiqueta}</span>
                 </div>
             `;
         });

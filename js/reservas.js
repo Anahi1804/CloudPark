@@ -80,8 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-function obtenerEstadoSensor(celda) {
-        const sensorHw = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
+function obtenerEstadoSensor(celda, sensorAutoAsignado = '') {
+        const sensorHw = celda.sensorFisico || sensorAutoAsignado || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
         if (sensorHw && estadoFisicoESP32 && estadoFisicoESP32[sensorHw] !== undefined) {
             return String(estadoFisicoESP32[sensorHw]).trim().toLowerCase();
         }
@@ -93,6 +93,8 @@ function obtenerEstadoSensor(celda) {
         const datosPiso = (sedeActual.pisos && sedeActual.pisos[String(pisoActual)]) || pisoRespaldo;
         contenedorCajones.style.gridTemplateColumns = `repeat(${datosPiso.columnas || 3}, 1fr)`;
         contenedorCajones.innerHTML = '';
+
+        let contadorSensorMaqueta = 1;
 
         datosPiso.celdas.forEach(celda => {
             if (celda.tipo === 'vacio') {
@@ -121,9 +123,15 @@ function obtenerEstadoSensor(celda) {
                 return;
             }
 
-            // Es un cajón (normal o discapacitado)
+            let sensorAuto = '';
+            if (pisoActual === 1 && contadorSensorMaqueta <= 6) {
+                sensorAuto = `cajon_${contadorSensorMaqueta}`;
+                contadorSensorMaqueta++;
+            }
+
+            const sensorVinculado = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo] || sensorAuto;
             const numero = celda.codigo;
-            const estadoSensor = obtenerEstadoSensor(celda);
+            const estadoSensor = obtenerEstadoSensor(celda, sensorVinculado);
             const estadoTicket = infoTickets[numero];
             const esDisc = celda.tipo === 'discapacitado';
 
@@ -155,7 +163,7 @@ function obtenerEstadoSensor(celda) {
                     return;
                 }
                 cajonSeleccionado = numero;
-                sensorFisicoSeleccionado = celda.sensorFisico || "";
+                sensorFisicoSeleccionado = sensorVinculado;
                 dibujarPlano();
 
                 infoCajon.innerHTML = `
@@ -169,7 +177,6 @@ function obtenerEstadoSensor(celda) {
             contenedorCajones.appendChild(divCajon);
         });
     }
-
     function resetearSeleccion() {
         cajonSeleccionado = null;
         sensorFisicoSeleccionado = "";
