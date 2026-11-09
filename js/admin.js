@@ -220,9 +220,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return misSedes;
     }
 
-    function guardarCatalogoEnNubeYLocal() {
+function guardarCatalogoEnNubeYLocal() {
         localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoGlobal));
-        set(ref(db, 'estacionamientos_red'), catalogoGlobal).catch(() => {});
+        // Guardamos en Firestore en lugar de la RTDB bloqueada
+        setDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_sedes"), {
+            sedes: catalogoGlobal
+        }).catch((err) => console.warn("Guardado en local:", err));
     }
 
     // Autenticación y carga del Admin propietario
