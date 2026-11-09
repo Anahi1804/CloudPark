@@ -80,9 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function obtenerEstadoSensor(celda) {
-        if (celda.sensorFisico) {
-            return String(estadoFisicoESP32[celda.sensorFisico] || 'libre').trim().toLowerCase();
+function obtenerEstadoSensor(celda) {
+        const sensorHw = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
+        if (sensorHw && estadoFisicoESP32 && estadoFisicoESP32[sensorHw] !== undefined) {
+            return String(estadoFisicoESP32[sensorHw]).trim().toLowerCase();
         }
         const virtSede = sensoresVirtuales[sedeActual.id] || {};
         return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();

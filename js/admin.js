@@ -569,9 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function obtenerEstadoSensorCajon(celda) {
-        if (celda.sensorFisico) {
-            return String(adminEstadoFisico[celda.sensorFisico] || 'libre').trim().toLowerCase();
+function obtenerEstadoSensorCajon(celda) {
+        // Si el cajón es A1, A2, A3, B1, B2 o B3, usa siempre su sensor físico de la maqueta por defecto
+        const sensorHw = celda.sensorFisico || PARKIL_CONFIG.SENSORES_MAQUETA[celda.codigo];
+        if (sensorHw && adminEstadoFisico && adminEstadoFisico[sensorHw] !== undefined) {
+            return String(adminEstadoFisico[sensorHw]).trim().toLowerCase();
         }
         const virtSede = adminSensoresVirtuales[estacionamientoActivoId] || {};
         return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();
