@@ -103,11 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const sedeRespaldo = catalogoSedes[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID] || sedesFallback[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID];
         return sedeRespaldo ? [sedeRespaldo] : [];
     };
-    const sedesConectadasIniciales = obtenerSedesConectadas();
-    let sedeSeleccionadaId = localStorage.getItem('estacionamientoSeleccionadoId');
-    if (!sedesConectadasIniciales.some(sede => sede.id === sedeSeleccionadaId)) {
-        sedeSeleccionadaId = sedesConectadasIniciales[0]?.id || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
-    }
+    const obtenerSedeVinculada = () => obtenerSedesConectadas()[0];
+    let sedeSeleccionadaId = localStorage.getItem('estacionamientoMapaSeleccionadoId') || localStorage.getItem('estacionamientoSeleccionadoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+    if (!catalogoSedes[sedeSeleccionadaId]) sedeSeleccionadaId = Object.keys(catalogoSedes)[0] || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
 
     const mapa = L.map('mapa-conductor').setView([19.8485, -90.5325], 14);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -124,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(marcadores).forEach(m => mapa.removeLayer(m));
         marcadores = {};
 
-        obtenerSedesConectadas().forEach(sede => {
+        Object.values(catalogoSedes).forEach(sede => {
             const lat = Number(sede.lat) || 19.8454;
             const lng = Number(sede.lng) || -90.5358;
 
@@ -152,10 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function seleccionarSede(id) {
         sedeSeleccionadaId = id;
         const sede = catalogoSedes[id];
-        localStorage.setItem('estacionamientoSeleccionadoId', id);
+        localStorage.setItem('estacionamientoMapaSeleccionadoId', id);
         if (sede) {
-            localStorage.setItem('estacionamientoSeleccionadoNombre', sede.nombre);
-            localStorage.setItem('tarifaHoraSeleccionada', sede.tarifaHora || 25);
             mapa.setView([Number(sede.lat) || 19.8454, Number(sede.lng) || -90.5358], 16);
             if (marcadores[id]) marcadores[id].openPopup();
         }
@@ -165,12 +161,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function actualizarBotonPrincipal() {
         const sede = catalogoSedes[sedeSeleccionadaId];
         if (!sede) return;
-        localStorage.setItem('estacionamientoSeleccionadoId', sede.id);
-        localStorage.setItem('estacionamientoSeleccionadoNombre', sede.nombre);
-        localStorage.setItem('tarifaHoraSeleccionada', sede.tarifaHora || 25);
+        const destino = obtenerSedeVinculada() || catalogoSedes[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID] || sede;
+        localStorage.setItem('estacionamientoSeleccionadoId', destino.id);
+        localStorage.setItem('estacionamientoSeleccionadoNombre', destino.nombre);
+        localStorage.setItem('tarifaHoraSeleccionada', destino.tarifaHora || 25);
 
         document.getElementById('titulo-reservar-sede').textContent = "Reservar cajón";
-        document.getElementById('subtitulo-reservar-sede').textContent = `${sede.nombre} ($${sede.tarifaHora}/hr)`;
+        document.getElementById('subtitulo-reservar-sede').textContent = `${destino.nombre} ($${destino.tarifaHora || 25}/hr)`;
     }
 
     renderizarSedesEnMapaYLista();
@@ -179,10 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_sedes")).then((docSnap) => {
         if (docSnap.exists() && docSnap.data().sedes) {
             catalogoSedes = docSnap.data().sedes;
-            if (!obtenerSedesConectadas().some(sede => sede.id === sedeSeleccionadaId)) {
-                sedeSeleccionadaId = obtenerSedesConectadas()[0]?.id || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
-                localStorage.setItem('estacionamientoSeleccionadoId', sedeSeleccionadaId);
-            }
+            if (!catalogoSedes[sedeSeleccionadaId]) sedeSeleccionadaId = Object.keys(catalogoSedes)[0] || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
             localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoSedes));
             renderizarSedesEnMapaYLista();
         }
