@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let catalogoSedes = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || '{}');
     const sedeInicial = catalogoSedes[sedeSolicitadaId];
     const tieneHardwareConfigurado = (sede) => Boolean(sede?.pisos && Object.values(sede.pisos).some(piso =>
-        (piso.celdas || []).some(celda => celda.tipo === 'cajon' && Boolean(celda.sensorFisico))
+        Array.isArray(piso?.celdas) && piso.celdas.some(celda => celda?.tipo === 'cajon' && Boolean(celda.sensorFisico))
     ));
     const sedeId = tieneHardwareConfigurado(sedeInicial) ? sedeSolicitadaId : PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
     let sedeActual = catalogoSedes[sedeId] || {

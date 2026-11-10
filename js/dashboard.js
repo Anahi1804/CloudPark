@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let catalogoSedes = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || 'null') || sedesFallback;
     const sedeTieneSensores = (sede) => Boolean(sede?.pisos && Object.values(sede.pisos).some(piso =>
-        (piso.celdas || []).some(celda => celda.tipo === 'cajon' && Boolean(celda.sensorFisico))
+        Array.isArray(piso?.celdas) && piso.celdas.some(celda => celda?.tipo === 'cajon' && Boolean(celda.sensorFisico))
     ));
     const obtenerSedesConectadas = () => {
         const sedesConHardware = Object.values(catalogoSedes).filter(sedeTieneSensores);
