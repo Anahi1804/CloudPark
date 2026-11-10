@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setDoc(historialRef, datosHistorial).then(() => {
                 return set(ticketRef, null);
             }).then(() => {
-                return set(ref(db, `cajones_bloqueados/${ticket.cajon}`), null);
+                return set(ref(db, `cajones_bloqueados/${ticket.estacionamientoId || 'default'}/${ticket.cajon}`), null);
             }).then(() => {
                 set(ref(db, 'control_plumas/salida'), 'abrir');
                 mostrarExito("¡Buen viaje! Abriendo pluma...");
@@ -74,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         Pago Confirmado en Nube
                     </div>
                 `;
-                localStorage.removeItem('ticketActual');
                 setTimeout(() => {
                     pantallaEstado.classList.add('oculto');
                     reactivarInterfaz();

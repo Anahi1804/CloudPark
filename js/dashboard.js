@@ -33,6 +33,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     btnIrAdmin.classList.remove('oculto');
                 }
             }
+            const ticketKey = `ticketActual:${user.uid}`;
+            try {
+                const ticketsSnap = await get(ref(db, 'tickets_activos'));
+                const ticketsActivos = ticketsSnap.val() || {};
+                const ticketsDelUsuario = Object.values(ticketsActivos)
+                    .filter(ticket => (ticket.usuarioUid === user.uid || (!ticket.usuarioUid && ticket.usuario === user.email)))
+                    .sort((a, b) => Number(b.timestampCompra || 0) - Number(a.timestampCompra || 0));
+                if (ticketsDelUsuario.length) {
+                    localStorage.setItem(ticketKey, JSON.stringify(ticketsDelUsuario[0]));
+                    tarjetaTicket.classList.remove('deshabilitada');
+                    tarjetaTicket.querySelector('.texto-secundario').textContent = ticketsDelUsuario.length > 1
+                        ? `Ver ticket (${ticketsDelUsuario.length} activos)` : "Ver Ticket";
+                } else {
+                    localStorage.removeItem(ticketKey);
+                    mostrarSinReservas();
+                }
+            } catch (error) {
+                console.warn('No se pudieron recuperar los tickets del usuario:', error);
+                mostrarSinReservas();
+            }
         } else {
             window.location.href = '../index.html';
         }
@@ -41,27 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSalir.addEventListener('click', () => {
         signOut(auth).then(() => {
             localStorage.removeItem('usuarioLogueado');
-            localStorage.removeItem('ticketActual');
             window.location.href = '../index.html';
         });
     });
-
-    // 2. Verificar si el usuario tiene un ticket activo en Firebase
-    const ticketLocalString = localStorage.getItem('ticketActual');
-    if (!ticketLocalString) {
-        mostrarSinReservas();
-    } else {
-        const ticketLocal = JSON.parse(ticketLocalString);
-        get(ref(db, 'tickets_activos/' + ticketLocal.codigo)).then((snapshot) => {
-            if (!snapshot.exists()) {
-                localStorage.removeItem('ticketActual');
-                mostrarSinReservas();
-            } else {
-                tarjetaTicket.classList.remove('deshabilitada');
-                tarjetaTicket.querySelector('.texto-secundario').textContent = "Ver Ticket";
-            }
-        });
-    }
 
     function mostrarSinReservas() {
         tarjetaTicket.classList.add('deshabilitada');
@@ -92,9 +94,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let catalogoSedes = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || 'null') || sedesFallback;
-    let sedeSeleccionadaId = localStorage.getItem('estacionamientoSeleccionadoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
-    if (!catalogoSedes[sedeSeleccionadaId]) {
-        sedeSeleccionadaId = Object.keys(catalogoSedes)[0];
+    const sedeTieneSensores = (sede) => Boolean(sede?.pisos && Object.values(sede.pisos).some(piso =>
+        (piso.celdas || []).some(celda => celda.tipo === 'cajon' && Boolean(celda.sensorFisico))
+    ));
+    const obtenerSedesConectadas = () => {
+        const sedesConHardware = Object.values(catalogoSedes).filter(sedeTieneSensores);
+        if (sedesConHardware.length) return sedesConHardware;
+        const sedeRespaldo = catalogoSedes[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID] || sedesFallback[PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID];
+        return sedeRespaldo ? [sedeRespaldo] : [];
+    };
+    const sedesConectadasIniciales = obtenerSedesConectadas();
+    let sedeSeleccionadaId = localStorage.getItem('estacionamientoSeleccionadoId');
+    if (!sedesConectadasIniciales.some(sede => sede.id === sedeSeleccionadaId)) {
+        sedeSeleccionadaId = sedesConectadasIniciales[0]?.id || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
     }
 
     const mapa = L.map('mapa-conductor').setView([19.8485, -90.5325], 14);
@@ -112,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(marcadores).forEach(m => mapa.removeLayer(m));
         marcadores = {};
 
-        Object.values(catalogoSedes).forEach(sede => {
+        obtenerSedesConectadas().forEach(sede => {
             const lat = Number(sede.lat) || 19.8454;
             const lng = Number(sede.lng) || -90.5358;
 
@@ -167,6 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
 getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_sedes")).then((docSnap) => {
         if (docSnap.exists() && docSnap.data().sedes) {
             catalogoSedes = docSnap.data().sedes;
+            if (!obtenerSedesConectadas().some(sede => sede.id === sedeSeleccionadaId)) {
+                sedeSeleccionadaId = obtenerSedesConectadas()[0]?.id || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+                localStorage.setItem('estacionamientoSeleccionadoId', sedeSeleccionadaId);
+            }
             localStorage.setItem('parkil_catalogo_sedes', JSON.stringify(catalogoSedes));
             renderizarSedesEnMapaYLista();
         }

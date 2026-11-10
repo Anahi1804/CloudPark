@@ -1,5 +1,5 @@
 // js/reservas.js - Renderizado Multi-Piso Dinámico y Sensores Híbridos (ESP32 + Virtuales)
-import { db, ref, onValue, PARKIL_CONFIG } from './firebase-config.js';
+import { db, ref, get, onValue, PARKIL_CONFIG } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const usuarioLogueado = localStorage.getItem('usuarioLogueado');
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoCajon = document.getElementById('info-cajon');
     const btnIrCarrito = document.getElementById('btn-ir-carrito');
 
-    const sedeId = localStorage.getItem('estacionamientoSeleccionadoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+    const sedeSolicitadaId = localStorage.getItem('estacionamientoSeleccionadoId') || PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
     let pisoActual = 1;
     let cajonSeleccionado = null;
     let sensorFisicoSeleccionado = "";
@@ -53,6 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let catalogoSedes = JSON.parse(localStorage.getItem('parkil_catalogo_sedes') || '{}');
+    const sedeInicial = catalogoSedes[sedeSolicitadaId];
+    const tieneHardwareConfigurado = (sede) => Boolean(sede?.pisos && Object.values(sede.pisos).some(piso =>
+        (piso.celdas || []).some(celda => celda.tipo === 'cajon' && Boolean(celda.sensorFisico))
+    ));
+    const sedeId = tieneHardwareConfigurado(sedeInicial) ? sedeSolicitadaId : PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
     let sedeActual = catalogoSedes[sedeId] || {
         id: sedeId,
         nombre: localStorage.getItem('estacionamientoSeleccionadoNombre') || "Parkil Centro Histórico",
@@ -92,7 +97,7 @@ function obtenerEstadoSensor(celda, sensorAutoAsignado = '') {
         const virtSede = sensoresVirtuales[sedeActual.id] || {};
         return String(virtSede[celda.codigo] || 'libre').trim().toLowerCase();
     }
-    
+
     function dibujarPlano() {
         const datosPiso = (sedeActual.pisos && sedeActual.pisos[String(pisoActual)]) || pisoRespaldo;
         contenedorCajones.style.gridTemplateColumns = `repeat(${datosPiso.columnas || 3}, 1fr)`;
@@ -191,16 +196,30 @@ function obtenerEstadoSensor(celda, sensorAutoAsignado = '') {
     renderizarBotonesPisos();
     dibujarPlano();
 
-    // Escuchar Hardware real ESP32
+    // El panel de usuario escucha los mismos nodos en tiempo real que el administrador.
+    onValue(ref(db, 'estacionamiento_actual'), (snapshot) => {
+        estadoFisicoESP32 = snapshot.val() || {};
+        dibujarPlano();
+    });
 
-
-    // Escuchar Sensores Virtuales
+    onValue(ref(db, `sensores_virtuales/${sedeId}`), (snapshot) => {
+        sensoresVirtuales[sedeId] = snapshot.val() || {};
+        dibujarPlano();
+    });
 
 
     // Escuchar planos actualizados por el Admin
     onValue(ref(db, `estacionamientos_red/${sedeId}`), (snapshot) => {
         if (snapshot.exists()) {
             sedeActual = snapshot.val();
+            if (!tieneHardwareConfigurado(sedeActual)) {
+                const fallbackId = PARKIL_CONFIG.ESTACIONAMIENTO_DEFAULT_ID;
+                if (sedeId !== fallbackId) {
+                    localStorage.setItem('estacionamientoSeleccionadoId', fallbackId);
+                    window.location.reload();
+                    return;
+                }
+            }
             document.getElementById('nombre-sede-header').textContent = sedeActual.nombre;
             renderizarBotonesPisos();
             dibujarPlano();

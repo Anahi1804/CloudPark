@@ -47,9 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (ahora > ticket.timestampExpiracion) {
                 await update(ticketRef, { estado: "vencido" });
-                const rutaCandado = ticket.estacionamientoId
-                    ? `cajones_bloqueados_${ticket.estacionamientoId}/${ticket.cajon}`
-                    : `cajones_bloqueados/${ticket.cajon}`;
+                const rutaCandado = `cajones_bloqueados/${ticket.estacionamientoId || 'default'}/${ticket.cajon}`;
                 await set(ref(db, rutaCandado), null);
                 mostrarEstado("Tu tiempo de tolerancia ha expirado. Debes generar otra reserva.", "error");
                 reactivarBoton();

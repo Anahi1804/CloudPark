@@ -1,8 +1,13 @@
 // js/pago-movil.js - Optimizado con soporte completo para Safari / iOS y conteo 24/7
 import { db, ref, onValue, get, update, auth, firestoreDB, onAuthStateChanged, collection, getDocs, PARKIL_CONFIG } from './firebase-config.js';
 
-document.addEventListener('DOMContentLoaded', () => {
-    const ticketGuardado = localStorage.getItem('ticketActual');
+document.addEventListener('DOMContentLoaded', async () => {
+    const userAtStart = await new Promise(resolve => {
+        const unsubscribe = onAuthStateChanged(auth, user => { unsubscribe(); resolve(user); });
+    });
+    if (!userAtStart) { window.location.href = '../index.html'; return; }
+    const ticketKey = `ticketActual:${userAtStart.uid}`;
+    const ticketGuardado = localStorage.getItem(ticketKey);
     if (!ticketGuardado) {
         alert("No tienes ninguna estancia activa.");
         window.location.href = 'dashboard.html';

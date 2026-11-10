@@ -181,7 +181,7 @@ const snapCfg = await getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_
             }
 
             const codigoGenerado = generarCodigoReserva();
-            const candadoRef = ref(db, `cajones_bloqueados/${cajonSeleccionado}`);
+            const candadoRef = ref(db, `cajones_bloqueados/${sedeId}/${cajonSeleccionado}`);
 
             runTransaction(candadoRef, (estadoActual) => {
                 if (estadoActual === null) return codigoGenerado;
@@ -204,6 +204,7 @@ const snapCfg = await getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_
 
                 const datosReserva = {
                     usuario: usuarioLogueado,
+                    usuarioUid: usuarioActualUID,
                     nombre: localStorage.getItem('nombreUsuario') || "Usuario",
                     placa: localStorage.getItem('placaUsuario') || "S/N",
                     cajon: cajonSeleccionado,
@@ -232,7 +233,7 @@ const snapCfg = await getDoc(doc(firestoreDB, "configuracion_parkil", "catalogo_
                 };
 
                 set(ref(db, 'tickets_activos/' + codigoGenerado), datosReserva).then(() => {
-                    localStorage.setItem('ticketActual', JSON.stringify(datosReserva));
+                    localStorage.setItem(`ticketActual:${usuarioActualUID}`, JSON.stringify(datosReserva));
                     localStorage.removeItem('cajonTemporal');
                     window.location.href = 'ticket.html';
                 });

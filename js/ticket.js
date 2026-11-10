@@ -1,8 +1,11 @@
 // js/ticket.js
+import { auth, onAuthStateChanged } from './firebase-config.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+onAuthStateChanged(auth, (user) => {
+    if (!user) { window.location.href = '../index.html'; return; }
     // 1. Recuperar los datos de la reserva finalizada
-    const datosReservaString = localStorage.getItem('ticketActual');
+    const ticketKey = `ticketActual:${user.uid}`;
+    const datosReservaString = localStorage.getItem(ticketKey);
 
     // 2. Seguridad: Si no hay ticket, regresar al mapa
     if (!datosReservaString) {
@@ -11,7 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const reserva = JSON.parse(datosReservaString);
+    let reserva;
+    try { reserva = JSON.parse(datosReservaString); }
+    catch { localStorage.removeItem(ticketKey); window.location.href = 'reservas.html'; return; }
+    if (reserva.usuario !== user.email) { window.location.href = 'reservas.html'; return; }
 
     // 3. Inyectar los datos en la vista
     document.getElementById('tkt-fecha').textContent = reserva.fechaTexto;

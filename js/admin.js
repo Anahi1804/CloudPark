@@ -761,7 +761,7 @@ function obtenerEstadoSensorCajon(celda, sensorAutoAsignado = '') {
 
             document.getElementById('btn-cancelar-reserva')?.addEventListener('click', () => {
                 set(ref(db, `tickets_activos/${datosTicket.id}`), null);
-                set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                set(ref(db, `cajones_bloqueados/${datosTicket.estacionamientoId || 'default'}/${codigoCajon}`), null);
                 showToast("Reserva cancelada y cajón liberado", "success");
             });
 
@@ -770,7 +770,7 @@ function obtenerEstadoSensorCajon(celda, sensorAutoAsignado = '') {
                 datosTicket.timestampSalida = Date.now();
                 await setDoc(doc(firestoreDB, "historial_tickets", datosTicket.id), datosTicket);
                 await set(ref(db, `tickets_activos/${datosTicket.id}`), null);
-                await set(ref(db, `cajones_bloqueados/${codigoCajon}`), null);
+                await set(ref(db, `cajones_bloqueados/${datosTicket.estacionamientoId || 'default'}/${codigoCajon}`), null);
                 showToast("Ticket archivado y cajón liberado", "success");
                 cargarHistorial();
             });
